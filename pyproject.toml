@@ -1,0 +1,31 @@
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = [".venv", "frontend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "C4", "SIM", "UP", "RET", "PLE", "PLW", "RUF"]
+ignore = [
+    "E501", "RUF001", "RUF002", "RUF003", "SIM108", "RET505", "UP037",
+    "UP042",  # (str, Enum) is kept on purpose: str() of the member must stay the plain value
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B", "SIM", "RUF012", "RUF005", "RUF015", "PLW"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+exclude = ['^\.venv', '^frontend']
+
+[tool.coverage.run]
+branch = true
+source = ["ai"]
+omit = ["*/__pycache__/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true

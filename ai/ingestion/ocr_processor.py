@@ -190,8 +190,8 @@ class OCRProcessor:
 
         lines: dict[tuple[int, int, int], list[str]] = {}
         confs: list[float] = []
-        for i, word in enumerate(data["text"]):
-            word = word.strip()
+        for i, raw_word in enumerate(data["text"]):
+            word = raw_word.strip()
             try:
                 conf = float(data["conf"][i])
             except (TypeError, ValueError):

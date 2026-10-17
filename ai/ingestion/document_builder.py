@@ -9,8 +9,22 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-from ai.ingestion.cleaners import clean_text, mark_headings
-from ai.ingestion.models import Document, PageContent, PageType, TableData
+from ai.ingestion.cleaners import mark_headings
+from ai.ingestion.models import (
+    Block,
+    BlockType,
+    Document,
+    PageContent,
+    PageType,
+    SourceInfo,
+    TableData,
+)
+from ai.ingestion.structure import (
+    apply_outline_levels,
+    finalize_document,
+    parse_markdown_blocks,
+    render_blocks,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +88,7 @@ class ConfidenceScorer:
             return 0.0
         if not text:
             return 0.9  # table-only page
-        bad = text.count("�") + sum(1 for c in text if ord(c) < 32 and c not in "\n\t")
+        bad = text.count("\ufffd") + sum(1 for c in text if ord(c) < 32 and c not in "\n\t")
         alnum = sum(c.isalnum() for c in text) / max(len(text), 1)
         penalty = min(bad / max(len(text), 1) * 10, 0.5)
         base = 0.6 + 0.4 * min(alnum / 0.7, 1.0)
@@ -104,30 +118,46 @@ class DocumentBuilder:
 
     # ------------------------------------------------------------------ page
     def finalize_page(self, page: PageContent) -> PageContent:
-        """Classify, score and assemble ``final_text`` for a page (in place)."""
+        """Classify, score, build blocks and assemble ``final_text`` for a page (in place)."""
         page.page_type = self.classifier.classify(page)
         page.confidence = self.scorer.score(page)
-        page.final_text = self._assemble(page)
+        page.blocks = self._build_blocks(page)
+        page.final_text = render_blocks(page.blocks)
         return page
 
-    def _assemble(self, page: PageContent) -> str:
-        parts: list[str] = []
+    def _build_blocks(self, page: PageContent) -> list[Block]:
+        """Reading-order blocks: page text first, then tables / image text by position."""
+        blocks: list[Block] = []
         if page.ocr_applied and page.ocr_text:
-            parts.append(mark_headings(page.ocr_text))
+            blocks.extend(parse_markdown_blocks(mark_headings(page.ocr_text), page.page_number))
         if page.text:
-            parts.append(page.text)
+            blocks.extend(parse_markdown_blocks(page.text, page.page_number))
 
         # Tables and image text follow the body, ordered top-to-bottom on the page.
         # Items without a position keep their relative order at the end.
-        extras: list[tuple[float, int, str]] = []
+        extras: list[tuple[float, int, Block]] = []
         for table in page.tables:
-            extras.append((self._top(table.bbox), len(extras),
-                           f"[Table {table.index + 1}]\n{self._render_table(table)}"))
+            table_block = Block(
+                BlockType.TABLE,
+                self._render_table(table),
+                page.page_number,
+                ref_index=table.index,
+                bbox=table.bbox,
+            )
+            extras.append((self._top(table.bbox), len(extras), table_block))
         for image in page.images_with_text:
-            extras.append((self._top(image.bbox), len(extras),
-                           f"[Image {image.index + 1} text]\n{image.ocr_text}"))
-        parts.extend(text for _, _, text in sorted(extras, key=lambda e: (e[0], e[1])))
-        return clean_text("\n\n".join(parts))
+            confidence = None if image.ocr_confidence is None else image.ocr_confidence / 100.0
+            image_block = Block(
+                BlockType.IMAGE_OCR,
+                image.ocr_text,
+                page.page_number,
+                ref_index=image.index,
+                bbox=image.bbox,
+                confidence=confidence,
+            )
+            extras.append((self._top(image.bbox), len(extras), image_block))
+        blocks.extend(block for _, _, block in sorted(extras, key=lambda e: (e[0], e[1])))
+        return blocks
 
     @staticmethod
     def _top(bbox: tuple[float, float, float, float] | None) -> float:
@@ -137,10 +167,28 @@ class DocumentBuilder:
         return table.to_key_value_text() if self.table_format == "key_value" else table.to_pipe_text()
 
     # -------------------------------------------------------------- document
-    def build(self, source_path: str, pages: list[PageContent], metadata: dict[str, object]) -> Document:
-        """Create the final :class:`Document` with statistics."""
-        document = Document(source_path=source_path, pages=pages, metadata=metadata)
-        document.statistics = self.compute_statistics(document)
+    def build(
+        self,
+        source_path: str,
+        pages: list[PageContent],
+        metadata: dict[str, object],
+        source: SourceInfo | None = None,
+    ) -> Document:
+        """Create the final :class:`Document`: heading levels, paths and statistics."""
+        document = Document(source_path=source_path, pages=pages, metadata=metadata, source=source)
+        document.statistics = self.compute_statistics(document)  # legacy PDF keys
+
+        # Bookmarks, when present, are the authority for heading levels.
+        raw_outline = metadata.get("outline") or []
+        outline = [
+            (int(level), str(title), int(page))
+            for level, title, page in raw_outline  # type: ignore[attr-defined]
+        ]
+        if apply_outline_levels(document, outline):
+            for page in pages:
+                page.final_text = render_blocks(page.blocks)
+
+        finalize_document(document, carry_across_pages=True)
         logger.info("Document built: %s", document.statistics)
         return document
 

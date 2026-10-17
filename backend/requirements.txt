@@ -1,5 +1,10 @@
 fastapi
 uvicorn
 pymupdf
+pdfplumber
+pillow
+pytesseract
 python-docx
 python-pptx
+chromadb
+sentence-transformers

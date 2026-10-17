@@ -9,8 +9,8 @@ from typing import Self
 
 import pdfplumber
 
-from ai.ingestion.models import TableData, TableExtractionError
 from ai.ingestion.cleaners import cell_clean
+from ai.ingestion.models import TableData, TableExtractionError
 
 logger = logging.getLogger(__name__)
 
