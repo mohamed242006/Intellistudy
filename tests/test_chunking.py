@@ -234,7 +234,7 @@ class TableEdgeTests(unittest.TestCase):
         row = parts[0].text.splitlines()[-1]
 
         self.assertEqual(row.count(" | "), 1)  # two cells, one separator
-        self.assertIn("a/b", row)
+        self.assertIn(r"a\|b", row)  # escaped, never rewritten to a different character (E2E-02)
 
     def test_duplicate_and_blank_header_names(self) -> None:
         parts = self.chunks([["x", "x", ""], ["1", "2", "3"]])

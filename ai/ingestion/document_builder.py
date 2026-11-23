@@ -10,6 +10,7 @@ import logging
 from typing import Literal
 
 from ai.ingestion.cleaners import mark_headings
+from ai.ingestion.figures import figure_block
 from ai.ingestion.models import (
     Block,
     BlockType,
@@ -145,7 +146,18 @@ class DocumentBuilder:
                 bbox=table.bbox,
             )
             extras.append((self._top(table.bbox), len(extras), table_block))
+        absorbed = {fig.image_index for fig in page.figures if fig.image_index is not None}
+        for fig in page.figures:
+            if fig.image_index is not None and fig.image_index < len(page.images):
+                source = page.images[fig.image_index]
+                fig.ocr_text = source.ocr_text
+                fig.ocr_confidence = None if source.ocr_confidence is None else source.ocr_confidence / 100.0
+            block = figure_block(fig)
+            if block.text.strip():
+                extras.append((self._top(fig.bbox), len(extras), block))
         for image in page.images_with_text:
+            if image.index in absorbed:
+                continue
             confidence = None if image.ocr_confidence is None else image.ocr_confidence / 100.0
             image_block = Block(
                 BlockType.IMAGE_OCR,

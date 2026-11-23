@@ -22,6 +22,7 @@ Document-level metadata:
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -37,6 +38,8 @@ from pptx.shapes.picture import Picture
 from pptx.slide import Slide
 
 from ai.ingestion.cleaners import cell_clean, clean_text
+from ai.ingestion.figure_selection import SelectionConfig, figure_features, select_figures
+from ai.ingestion.figures import Caption, figure_block, guess_figure_type, horizontal_overlap, parse_caption
 from ai.ingestion.image_ocr import (
     SCORE_SKIPPED_DEFAULT,
     SKIP_READ_FAILED,
@@ -50,6 +53,7 @@ from ai.ingestion.models import (
     Block,
     BlockType,
     Document,
+    FigureData,
     ImageData,
     IngestionError,
     PageContent,
@@ -78,6 +82,7 @@ _VERTICAL_TAB = "\x0b"  # python-pptx represents soft line breaks as vertical ta
 # so side-by-side boxes that differ slightly in Y are read left-to-right.
 _ROW_BUCKET_EMU = 100_000
 
+_INFERRED_TITLE_MIN_PT = 18.0
 _TITLE_PLACEHOLDERS = (PP_PLACEHOLDER.TITLE, PP_PLACEHOLDER.CENTER_TITLE)
 # Body-like placeholders inherit bullets from the slide master even when the
 # paragraph itself carries no explicit bullet properties.
@@ -152,8 +157,11 @@ class PptxReader:
             dependency injection in tests or custom configuration).
     """
 
-    def __init__(self, ocr_processor: OCRProcessor | None = None) -> None:
+    def __init__(
+        self, ocr_processor: OCRProcessor | None = None, figure_config: SelectionConfig | None = None
+    ) -> None:
         self._ocr: OCRProcessor = ocr_processor or OCRProcessor()
+        self._figure_config = figure_config or SelectionConfig()
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -202,6 +210,11 @@ class PptxReader:
             statistics=self._build_statistics(slides),
             source=source,
         )
+        figure_summary = self._figure_pass(
+            pages, ((presentation.slide_width or 9144000) / 12700, (presentation.slide_height or 6858000) / 12700)
+        )
+        if figure_summary:
+            document.metadata["figures"] = figure_summary
         # Every slide is its own root: heading paths must not leak across slides.
         finalize_document(document, carry_across_pages=False)
         logger.info(
@@ -316,7 +329,123 @@ class PptxReader:
             blocks.append(Block(BlockType.NOTES, notes, slide_number))
 
         page = self._build_page(slide_number, blocks, tables, images, chart_scores, warnings)
+        page.figures = self._figure_candidates(shapes, images, slide_number)
         return _SlideData(page=page, title=title, has_notes=bool(notes), hidden=hidden)
+
+    def _figure_candidates(self, shapes: list[Any], images: list[ImageData], slide_number: int) -> list[FigureData]:
+        """One candidate per picture, with the nearest "Figure N: ..." text box as its caption."""
+        captions: list[tuple[Caption, tuple[float, float, float, float]]] = []
+        for shape in shapes:
+            if not getattr(shape, "has_text_frame", False):
+                continue
+            box = self._shape_bbox(shape)
+            text = " ".join(clean_text(shape.text_frame.text.replace(_VERTICAL_TAB, " ")).split())
+            parsed = parse_caption(text, bold_label=False) if text else None
+            if parsed is not None and box is not None:
+                captions.append((parsed, box))
+        taken: set[int] = set()
+        candidates: list[FigureData] = []
+        for image in images:
+            if image.width <= 0 or image.bbox is None:
+                continue
+            best: tuple[float, int] | None = None
+            for number, (_caption, box) in enumerate(captions):
+                if number in taken or horizontal_overlap(image.bbox, box) < 0.3:
+                    continue
+                below, above = box[1] - image.bbox[3], image.bbox[1] - box[3]
+                gap = below if -6 <= below <= 80 else above if -6 <= above <= 40 else None
+                if gap is not None and (best is None or gap < best[0]):
+                    best = (gap, number)
+            figure = FigureData(
+                page_number=slide_number,
+                index=len(candidates),
+                kind="pptx_picture",
+                bbox=image.bbox,
+                image_index=image.index,
+                alt_text=image.alt_text,
+            )
+            if best is not None:
+                taken.add(best[1])
+                caption, box = captions[best[1]]
+                figure.label, figure.number, figure.caption, figure.caption_bbox = caption.label, caption.number, caption.text, box
+                figure.figure_type = guess_figure_type(caption.text)
+            candidates.append(figure)
+        for number, (caption, box) in enumerate(captions):
+            if number not in taken:  # a caption whose graphic is not a picture (shapes, SmartArt)
+                candidates.append(
+                    FigureData(
+                        page_number=slide_number,
+                        index=len(candidates),
+                        kind="caption_only",
+                        bbox=box,
+                        label=caption.label,
+                        number=caption.number,
+                        caption=caption.text,
+                        caption_bbox=box,
+                        figure_type=guess_figure_type(caption.text),
+                    )
+                )
+        return candidates
+
+    def _figure_pass(self, pages: list[PageContent], size: tuple[float, float]) -> dict[str, Any]:
+        """Select figures over the whole deck, then swap the OCR blocks of kept pictures for figure blocks."""
+        for page in pages:
+            page.size = size
+        candidates = sum(len(p.figures) for p in pages)
+        if not candidates:
+            return {}
+        decisions = select_figures(pages, self._figure_config)
+        kept_ids = {id(f) for f, d in decisions if d.keep}
+        skipped = [{"page": f.page_number, "kind": f.kind, "reasons": list(d.reasons)} for f, d in decisions if not d.keep]
+        detail = [
+            {
+                "page": f.page_number, "image_index": f.image_index, "kind": f.kind, "label": f.label,
+                "bbox": [round(v, 1) for v in f.bbox] if f.bbox else None,
+                "keep": d.keep, "score": d.score, "reasons": list(d.reasons),
+                "features": figure_features(f, pages[f.page_number - 1]),
+            }
+            for f, d in decisions
+        ]
+        kept = 0
+        for page in pages:
+            page.figures = [f for f in page.figures if id(f) in kept_ids]
+            for number, figure in enumerate(page.figures):
+                figure.index = number
+            kept += len(page.figures)
+            if page.figures:
+                self._swap_blocks_for_figures(page)
+        return {"candidates": candidates, "kept": kept, "skipped": skipped[:200], "decisions": detail[:1000]}
+
+    @staticmethod
+    def _swap_blocks_for_figures(page: PageContent) -> None:
+        blocks = page.blocks
+        for figure in page.figures:
+            source = page.images[figure.image_index] if figure.image_index is not None else None
+            if source is not None:
+                figure.ocr_text = source.ocr_text
+                figure.ocr_confidence = None if source.ocr_confidence is None else source.ocr_confidence / 100.0
+            position = len(blocks)
+            if source is not None:
+                for i, block in enumerate(blocks):
+                    if block.type is BlockType.IMAGE_OCR and block.ref_index == source.index:
+                        position = i
+                        blocks.pop(i)
+                        break
+            if figure.caption:  # the caption now lives in the figure block
+                wanted = " ".join(figure.caption.split())
+                for i, block in enumerate(blocks):
+                    if block.type is BlockType.PARAGRAPH and " ".join(block.text.split()) in wanted and len(block.text) > 3:
+                        if i < position:
+                            position -= 1
+                        blocks.pop(i)
+                        break
+            block = figure_block(figure)
+            if block.text.strip():
+                if position == len(blocks) and blocks and blocks[-1].type is BlockType.NOTES:
+                    position -= 1
+                blocks.insert(position, block)
+        page.text = render_blocks(blocks, TEXT_BLOCK_TYPES)
+        page.final_text = render_blocks(blocks)
 
     @staticmethod
     def _is_hidden(slide: Slide) -> bool:
@@ -390,10 +519,61 @@ class PptxReader:
             logger.debug("Could not read slide title shape: %s", exc)
         if title_shape is None:
             title_shape = cls._find_grouped_title(shapes)
+        if title_shape is None:
+            title_shape = cls._infer_title(shapes)
         if title_shape is None or not getattr(title_shape, "has_text_frame", False):
             return None, ""
         title = " ".join(clean_text(title_shape.text_frame.text.replace(_VERTICAL_TAB, " ")).split())
         return title_shape, title
+
+    @classmethod
+    def _infer_title(cls, shapes: list[Any]) -> Any | None:
+        """Title of a slide that has no title placeholder (designs built from plain text boxes).
+
+        Conservative: the text box with the clearly largest explicit font size, when it is
+        a short, non-numeric phrase of at least ``_INFERRED_TITLE_MIN_PT``, and no other
+        text box ties with it. Anything ambiguous returns ``None`` (no heading is better
+        than a wrong one).
+        """
+        sized: list[tuple[float, Any, str]] = []
+        for shape in shapes:
+            try:
+                if cls._is_furniture(shape) or not getattr(shape, "has_text_frame", False):
+                    continue
+                text = " ".join(clean_text(shape.text_frame.text.replace(_VERTICAL_TAB, " ")).split())
+                sizes = [
+                    run.font.size.pt
+                    for paragraph in shape.text_frame.paragraphs
+                    for run in paragraph.runs
+                    if run.font.size is not None and run.text.strip()
+                ]
+            except Exception as exc:  # odd shapes must not break the slide
+                logger.debug("Skipping shape while inferring a title: %s", exc)
+                continue
+            if text and sizes:
+                sized.append((max(sizes), shape, text))
+        if not sized:
+            return None
+        sized.sort(key=lambda item: -item[0])
+        best_size, best_shape, best_text = sized[0]
+        others = [item for item in sized[1:] if abs(item[0] - best_size) < 0.5]
+        letters = sum(ch.isalpha() for ch in best_text)
+        plausible = (
+            best_size >= _INFERRED_TITLE_MIN_PT
+            and len(best_text) <= 100
+            and len(best_text.split()) <= 12
+            and letters >= 2
+            and not best_text.endswith((".", ",", ";"))
+        )
+        if not plausible:
+            return None
+        # a tie with another *title-like* box (not a number or a long sentence) is ambiguous
+        if any(
+            sum(ch.isalpha() for ch in text) >= 2 and len(text.split()) <= 12
+            for _size, _shape, text in others
+        ):
+            return None
+        return best_shape
 
     @staticmethod
     def _find_grouped_title(shapes: list[Any]) -> Any | None:
@@ -562,6 +742,8 @@ class PptxReader:
             lines.append(f"Y-Axis: {y_title}")
         if series:
             lines.append(f"Series: {cls._join_limited(series)}")
+        data = cls._safe(lambda: cls._chart_data_lines(chart, categories)) or []
+        lines.extend(data)
 
         if cls._safe(lambda: bool(chart.has_legend)):
             # Pie-like charts (no category axis) list their slices in the legend.
@@ -574,6 +756,37 @@ class PptxReader:
         chart_type = cls._safe(lambda: cls._chart_type_name(chart))
         if chart_type:
             lines.append(f"Chart Type: {chart_type}")
+        return lines
+
+    @staticmethod
+    def _chart_data_lines(chart: Any, categories: list[str]) -> list[str]:
+        """The plotted numbers: ``Data: Q1: Model A 0.82, Model B 0.91`` per category (bounded)."""
+        names: list[str] = []
+        columns: list[list[Any]] = []
+        for plot in chart.plots:
+            for series in plot.series:
+                names.append(" ".join(str(series.name or f"series {len(names) + 1}").split()))
+                columns.append(list(series.values))
+        if not columns:
+            return []
+
+        def fmt(value: Any) -> str:
+            if value is None:
+                return "n/a"
+            return f"{value:.4g}" if isinstance(value, float) else str(value)
+
+        limit_series, limit_rows = 6, 15
+        lines = []
+        if categories and len(categories) == len(columns[0]):
+            for i, category in enumerate(categories[:limit_rows]):
+                cells = ", ".join(f"{names[j]} {fmt(columns[j][i])}" for j in range(min(len(columns), limit_series)) if i < len(columns[j]))
+                lines.append(f"Data: {category}: {cells}")
+            if len(categories) > limit_rows:
+                lines.append(f"Data: ... {len(categories) - limit_rows} more categories")
+        else:
+            for j in range(min(len(columns), limit_series)):
+                shown = ", ".join(fmt(v) for v in columns[j][:30])
+                lines.append(f"Data: {names[j]}: {shown}")
         return lines
 
     @staticmethod
@@ -666,8 +879,8 @@ class PptxReader:
                 logger.warning("Slide %d: skipping table (%s): %s", slide_number, shape.name, exc)
                 warnings.append(f"Slide {slide_number}: table '{shape.name}' skipped ({exc})")
                 continue
-            if not rows:
-                continue
+            if not any(cell.strip() for row in rows for cell in row):
+                continue  # empty or purely decorative table: nothing to read or cite
             index = start_index + len(tables)
             tables.append(TableData(page_number=slide_number, index=index, rows=rows))
         return tables
@@ -765,10 +978,39 @@ class PptxReader:
                 ext=ext,
             )
             image_data, warning = self._process_cached(raw, ocr_cache)
+            # a copy: the cached object belongs to the first slide that used the picture
+            image_data = replace(
+                image_data,
+                bbox=self._shape_bbox(shape),
+                thumb_hash=sha1[:16] if sha1 else "",
+                alt_text=self._alt_text(shape),
+            )
             images.append(image_data)
             if warning:
                 warnings.append(warning)
         return images
+
+    @staticmethod
+    def _shape_bbox(shape: Any) -> tuple[float, float, float, float] | None:
+        """Position on the slide in points (1 pt = 12700 EMU)."""
+        try:
+            left, top, width, height = shape.left, shape.top, shape.width, shape.height
+            if None in (left, top, width, height):
+                return None
+            return (left / 12700, top / 12700, (left + width) / 12700, (top + height) / 12700)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _alt_text(shape: Any) -> str:
+        """The author's description of a picture (``descr``), unless it is just the file name."""
+        try:
+            descr = str(shape._element.xpath("./p:nvPicPr/p:cNvPr/@descr")[0]).strip()
+        except Exception:
+            return ""
+        if not descr or re.search(r"\.(png|jpe?g|gif|emf|wmf|bmp|tiff?)$", descr, re.IGNORECASE):
+            return ""
+        return " ".join(descr.split())
 
     def _process_cached(self, raw: _RawImage, ocr_cache: _OcrCache) -> tuple[ImageData, str | None]:
         """Run :meth:`_process_raw_image`, reusing the result for identical pictures.

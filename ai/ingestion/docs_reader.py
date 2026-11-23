@@ -30,6 +30,8 @@ from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph as DocxParagraph
 
 from ai.ingestion.cleaners import cell_clean, clean_text
+from ai.ingestion.figure_selection import SelectionConfig, figure_features, select_figures
+from ai.ingestion.figures import figure_block, guess_figure_type, parse_caption
 from ai.ingestion.image_ocr import (
     SKIP_READ_FAILED,
     classify_page,
@@ -42,6 +44,7 @@ from ai.ingestion.models import (
     Block,
     BlockType,
     Document,
+    FigureData,
     ImageData,
     IngestionError,
     PageContent,
@@ -128,6 +131,10 @@ class _Body:
     tables: list[TableData] = field(default_factory=list)
     headings: list[dict[str, Any]] = field(default_factory=list)
     paragraph_count: int = 0
+    image_slots: list[tuple[int, int, tuple[float, float] | None]] = field(default_factory=list)
+    # (image index, position in ``blocks`` where the picture sits, displayed size in points)
+    figures: list[FigureData] = field(default_factory=list)
+    figure_summary: dict[str, Any] = field(default_factory=dict)
 
 
 class _NumberingResolver:
@@ -183,8 +190,11 @@ class DocxReader:
             dependency injection in tests or custom configuration).
     """
 
-    def __init__(self, ocr_processor: OCRProcessor | None = None) -> None:
+    def __init__(
+        self, ocr_processor: OCRProcessor | None = None, figure_config: SelectionConfig | None = None
+    ) -> None:
         self._ocr: OCRProcessor = ocr_processor or OCRProcessor()
+        self._figure_config = figure_config or SelectionConfig()
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -208,8 +218,11 @@ class DocxReader:
 
         image_batch = self._extract_and_ocr_images(docx_doc)
         body = self._extract_body(docx_doc, image_batch)
+        self._figure_pass(docx_doc, body, image_batch)
 
         page = self._build_page(body, image_batch)
+        page.figures = body.figures
+        page.size = self._page_size(docx_doc)
         metadata = self._build_metadata(
             docx_doc,
             file_path,
@@ -234,6 +247,8 @@ class DocxReader:
             statistics=self._build_statistics(body, page),
             source=source,
         )
+        if body.figure_summary:
+            document.metadata["figures"] = body.figure_summary
         finalize_document(document)
         logger.info(
             "Finished DOCX %s: %d paragraphs, %d headings, %d tables, "
@@ -427,8 +442,118 @@ class DocxReader:
                 continue
             placed.add(index)
             image = batch.images[index]
+            body.image_slots.append((index, len(body.blocks), self._display_size(node)))
             if image.ocr_text:
                 body.blocks.append(self._image_block(image))
+
+    @staticmethod
+    def _display_size(node: Any) -> tuple[float, float] | None:
+        """Size the picture is shown at, in points, from the ``wp:extent`` of its drawing."""
+        try:
+            current = node
+            while current is not None:
+                for extent in current.xpath("./*[local-name()='extent']"):
+                    return int(extent.get("cx")) / 12700, int(extent.get("cy")) / 12700
+                current = current.getparent()
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    def _page_size(docx_doc: DocxDocument) -> tuple[float, float]:
+        try:
+            section = docx_doc.sections[0]
+            width, height = section.page_width, section.page_height
+            if width is None or height is None:
+                return 612.0, 792.0
+            return float(width.pt), float(height.pt)
+        except Exception:
+            return 612.0, 792.0
+
+    def _figure_pass(self, docx_doc: DocxDocument, body: _Body, batch: _ImageBatch) -> None:
+        """Pair pictures with the caption paragraph next to them, select, and swap OCR blocks for figure blocks."""
+        page_w, page_h = self._page_size(docx_doc)
+        page = PageContent(page_number=LOGICAL_PAGE_NUMBER, size=(page_w, page_h), images=batch.images)
+        page.text = render_blocks(body.blocks, TEXT_BLOCK_TYPES)
+        captions_taken: set[int] = set()
+        caption_block_of: dict[int, int] = {}  # figure index -> position of its caption paragraph
+        for index, position, size in body.image_slots:
+            image = batch.images[index]
+            if image.width <= 0:
+                continue
+            width, height = size if size else (min(image.width, page_w * 0.8), min(image.height, page_h * 0.4))
+            top = (page_h - height) / 2
+            figure = FigureData(
+                page_number=LOGICAL_PAGE_NUMBER,
+                index=len(page.figures),
+                kind="docx_inline",
+                bbox=(0.0, top, width, top + height),
+                image_index=index,
+            )
+            at = position + (1 if image.ocr_text else 0)  # the caption is the paragraph right after / before
+            for candidate in (at, at + 1, position - 1):
+                if 0 <= candidate < len(body.blocks) and candidate not in captions_taken:
+                    block = body.blocks[candidate]
+                    caption = parse_caption(block.text) if block.type is BlockType.PARAGRAPH else None
+                    if caption is not None:
+                        captions_taken.add(candidate)
+                        figure.label, figure.number, figure.caption = caption.label, caption.number, caption.text
+                        figure.figure_type = guess_figure_type(caption.text)
+                        caption_block_of[figure.index] = candidate
+                        break
+            page.figures.append(figure)
+        if not page.figures:
+            return
+        decisions = select_figures([page], self._figure_config)
+        kept = {id(f) for f, d in decisions if d.keep}
+        detail = [
+            {"page": 1, "image_index": f.image_index, "kind": f.kind, "label": f.label, "bbox": None,
+             "keep": d.keep, "score": d.score, "reasons": list(d.reasons), "features": figure_features(f, page)}
+            for f, d in decisions
+        ]
+        drop: set[int] = set()
+        replace_at: dict[int, Block | None] = {}
+        insert_before: dict[int, list[Block]] = {}
+        for figure in [f for f in page.figures if id(f) in kept]:
+            source = batch.images[figure.image_index] if figure.image_index is not None else None
+            if source is not None:
+                figure.ocr_text = source.ocr_text
+                figure.ocr_confidence = None if source.ocr_confidence is None else source.ocr_confidence / 100.0
+            caption_block = caption_block_of.get(figure.index)
+            if caption_block is not None:
+                drop.add(caption_block)
+            new_block = figure_block(figure)
+            slot = next(p for i, p, _ in body.image_slots if i == figure.image_index)
+            ocr_here = source is not None and bool(source.ocr_text)
+            if ocr_here:
+                replace_at[slot] = new_block if new_block.text.strip() else None
+            elif new_block.text.strip():
+                insert_before.setdefault(slot, []).append(new_block)
+        rebuilt: list[Block] = []
+        for position, block in enumerate(body.blocks):
+            rebuilt.extend(insert_before.get(position, []))
+            if position in drop:
+                continue
+            if position in replace_at:
+                if replace_at[position] is not None:
+                    rebuilt.append(replace_at[position])  # type: ignore[arg-type]
+                continue
+            rebuilt.append(block)
+        rebuilt.extend(insert_before.get(len(body.blocks), []))
+        body.blocks[:] = rebuilt
+        page.figures = [f for f in page.figures if id(f) in kept]
+        for number, figure in enumerate(page.figures):
+            figure.index = number
+        # block refs point at figure positions: figure blocks were built with the pre-renumber index
+        figure_blocks = [b for b in body.blocks if b.type is BlockType.FIGURE]
+        for block, figure in zip(figure_blocks, page.figures, strict=False):
+            block.ref_index = figure.index
+        body.figures = page.figures
+        body.figure_summary = {
+            "candidates": len(decisions), "kept": len(page.figures),
+            "skipped": [{"page": 1, "kind": f.kind, "reasons": list(d.reasons)} for f, d in decisions if not d.keep][:200],
+            "decisions": detail,
+        }
 
     @staticmethod
     def _image_block(image: ImageData) -> Block:

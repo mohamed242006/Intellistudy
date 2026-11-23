@@ -1,5 +1,23 @@
 # IntelliStudy Chunking Design Specification (v1.0)
 
+> **STATUS: HISTORICAL (superseded in part, banner added 2026-11-15).** Kept for design context: it records the
+> original chunking rules and the reasoning behind them. The text below is unchanged, including its own §12-13 notes.
+> The current single source of truth is [`project_context.md`](project_context.md). Outdated here:
+> - **Chunk ID format** (§3, `{doc_id}-{ordinal:05d}-{content_hash[:8]}`): replaced in chunker 1.3.0 by
+>   `c-{hash12}` / `p-{hash12}` - project_context.md §3.2 and §5.
+> - **Chunker version** (`chunker_version "1.0.0"`): current is **1.3.0** - project_context.md §3.2.
+> - **Schema version** (`"2.0"`): current is **2.1** - project_context.md §3.1.
+> - **Figure chunks**: not in the `kind` list here; `figure` exists since chunker 1.2.0 - project_context.md §3.8.
+> - **Thresholds in the §1.1 table** (`slide_min_body_tokens` 20, `ocr_min_confidence` 0.55, `include_hidden`):
+>   superseded by §12-13 of this file and project_context.md §3.2 (6 tokens; OCR < 0.3 dropped, < 0.6 flagged;
+>   hidden slides always excluded).
+> - **Citation markers** `[C1]..[Ck]` (§8.5): the answer layer uses `[S1]..[Sn]` in prompts and `[n]` for readers -
+>   project_context.md §3.10.
+> - **Embedding and vector store** (§12 "Not yet built: vector-store adapter ... embedding job"): built -
+>   project_context.md §3.3-3.4. **PostgreSQL persistence and the transactional re-ingestion with tombstoned rows (§9,
+>   §10.1)** are still NOT built: stale chunks are deleted immediately - project_context.md §3.6 and §7.
+> - **Reranker, answer layer, real-model evaluation**: not covered here - project_context.md §3.5, §3.10, §11.
+
 Status: implementation-ready. Input: `Document` schema 2.0 from `ai/ingestion`. Output: `Chunk` records ready for PostgreSQL + ChromaDB.
 Proposed package: `ai/chunking/` (`models.py`, `chunker.py`, `tokens.py`, `ids.py`, `render.py`, `config.py`).
 

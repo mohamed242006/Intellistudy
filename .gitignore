@@ -23,3 +23,7 @@ node_modules/
 # Local data
 data/chroma/
 *.sqlite3
+
+# evaluation artefacts
+evaluation/.index/
+evaluation/results/

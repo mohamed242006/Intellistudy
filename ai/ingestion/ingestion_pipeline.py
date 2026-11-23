@@ -30,12 +30,15 @@ from pathlib import Path
 
 from ai.ingestion.docs_reader import DOCX_SUFFIXES, DocxReader
 from ai.ingestion.document_builder import DocumentBuilder
+from ai.ingestion.figure_selection import SelectionConfig, apply_stats, figure_features, select_figures
+from ai.ingestion.figures import area, detect_pdf_figures, intersection
 from ai.ingestion.models import (
     Document,
     ImageExtractionError,
     IngestionError,
     OCRError,
     PageContent,
+    TableData,
     TableExtractionError,
 )
 from ai.ingestion.ocr_processor import OCRProcessor
@@ -47,6 +50,13 @@ from ai.ingestion.table_extractor import TableExtractor
 logger = logging.getLogger(__name__)
 
 PDF_SUFFIXES: frozenset[str] = frozenset({".pdf"})
+
+_MIN_TABLE_FILL = 0.4  # below this share of non-empty cells a detected table is treated as a chart frame
+
+
+def _filled_fraction(table: TableData) -> float:
+    cells = [cell for row in table.rows for cell in row]
+    return sum(1 for cell in cells if str(cell).strip()) / len(cells) if cells else 0.0
 
 # MIME type -> canonical suffix, for uploads whose filename is not trustworthy.
 MIME_TYPES: dict[str, str] = {
@@ -84,8 +94,12 @@ class IngestionPipeline:
         enable_tables: bool = True,
         docx_reader: DocxReader | None = None,
         pptx_reader: PptxReader | None = None,
+        enable_figures: bool = True,
+        figure_config: SelectionConfig | None = None,
     ) -> None:
         self.reader = reader or PDFReader()
+        self.enable_figures = enable_figures
+        self.figure_config = figure_config or SelectionConfig()
         self._ocr = ocr
         self.table_extractor = table_extractor or TableExtractor()
         self.builder = builder or DocumentBuilder(min_text_chars=self.reader.min_text_chars)
@@ -194,6 +208,10 @@ class IngestionPipeline:
                         fitz_doc, fitz_page, tables_ready, running, profile, failed
                     )
                 )
+            if self.enable_figures:
+                figure_summary = self._figure_pass(fitz_doc, pages, running, profile)
+                if figure_summary:
+                    metadata["figures"] = figure_summary
         finally:
             fitz_doc.close()
             self.table_extractor.close()
@@ -255,6 +273,9 @@ class IngestionPipeline:
 
             if tables_ready and not page.ocr_applied:  # Layer 3 - needs a real text layer
                 self._run_tables(fitz_page, page, running, profile)
+            page.size = (float(fitz_page.rect.width), float(fitz_page.rect.height))
+            if self.enable_figures and not page.ocr_applied:  # figures: candidates only, chosen per document
+                self._detect_figures(fitz_doc, fitz_page, page)
             return page
         except Exception as exc:  # one bad page must never kill the document
             logger.exception("Page %d failed: %s", number, exc)
@@ -262,6 +283,84 @@ class IngestionPipeline:
             broken = PageContent(page_number=number, confidence=0.0)
             broken.warnings.append(f"Page processing failed: {exc}")
             return broken
+
+    def _detect_figures(self, fitz_doc, fitz_page, page: PageContent) -> None:
+        try:
+            # a nearly empty "table" is usually the gridlines and legend of a chart: not a reason to ignore the graphic
+            tables = [t.bbox for t in page.tables if t.bbox and _filled_fraction(t) >= _MIN_TABLE_FILL]
+            page.figures = detect_pdf_figures(fitz_page, page.images, tables=tables)
+            for figure in page.figures:  # fingerprints feed repetition / flat-colour rules
+                if figure.image_index is None:
+                    continue
+                image = page.images[figure.image_index]
+                try:
+                    apply_stats(image, self.reader.load_image(fitz_doc, image))
+                except ImageExtractionError as exc:
+                    logger.debug("No fingerprint for image on page %d: %s", page.page_number, exc)
+        except Exception as exc:  # figure detection must never cost a page its text
+            logger.warning("Figure detection failed on page %d: %s", page.page_number, exc)
+            page.figures = []
+            page.warnings.append(f"Figure detection failed: {exc}")
+
+    def _figure_pass(self, fitz_doc, pages: list[PageContent], running: RunningLines, profile: LayoutProfile) -> dict:
+        """Keep the figures worth keeping and take their words out of the running text."""
+        candidates = sum(len(p.figures) for p in pages)
+        if not candidates:
+            return {}
+        decisions = select_figures(pages, self.figure_config)
+        kept_ids = {id(f) for f, d in decisions if d.keep}
+        skipped = [
+            {"page": f.page_number, "kind": f.kind, "reasons": list(d.reasons)} for f, d in decisions if not d.keep
+        ]
+        detail = [
+            {
+                "page": f.page_number, "image_index": f.image_index, "kind": f.kind, "label": f.label,
+                "bbox": [round(v, 1) for v in f.bbox] if f.bbox else None,
+                "keep": d.keep, "score": d.score, "reasons": list(d.reasons),
+                "features": figure_features(f, pages[f.page_number - 1]),
+            }
+            for f, d in decisions
+        ]
+        kept = 0
+        for page in pages:
+            page.figures = [f for f in page.figures if id(f) in kept_ids]
+            for number, figure in enumerate(page.figures):
+                figure.index = number
+            kept += len(page.figures)
+            if not page.figures:
+                continue
+            self._drop_chart_tables(page)
+            boxes = [t.bbox for t in page.tables if t.bbox]
+            for figure in page.figures:
+                if figure.caption_bbox:
+                    boxes.append(figure.caption_bbox)
+                if figure.kind == "vector_region" and figure.bbox:
+                    boxes.append(figure.bbox)
+            try:
+                page.text = self.reader.extract_text(
+                    fitz_doc[page.page_number - 1], exclude_bboxes=boxes, running=running, profile=profile
+                )
+            except Exception as exc:  # keep the original text rather than lose the page
+                logger.warning("Re-reading page %d without figures failed: %s", page.page_number, exc)
+        return {"candidates": candidates, "kept": kept, "skipped": skipped[:200], "decisions": detail[:1000]}
+
+    @staticmethod
+    def _drop_chart_tables(page: PageContent) -> None:
+        """Remove "tables" that are really the frame of a kept figure (mostly empty cells inside its box)."""
+        graphics = [f.bbox for f in page.figures if f.bbox and f.kind in ("vector_region", "raster")]
+        if not graphics:
+            return
+        keep = []
+        for table in page.tables:
+            inside = table.bbox is not None and any(
+                intersection(table.bbox, g) > 0.6 * area(table.bbox) for g in graphics
+            )
+            if not (inside and _filled_fraction(table) < _MIN_TABLE_FILL):
+                keep.append(table)
+        if len(keep) != len(page.tables):
+            for number, table in enumerate(keep):
+                table.index = number
+            page.tables = keep
 
     def _finalize(self, page: PageContent, failed: set[int]) -> PageContent:
         """Layer 4 for one page, with the same isolation as extraction."""

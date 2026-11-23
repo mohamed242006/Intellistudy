@@ -155,6 +155,12 @@ class RunningLines:
         ]
 
 
+def _is_rotated(line: dict) -> bool:
+    """True for text not running left-to-right (PyMuPDF line direction ``(cos, sin)``)."""
+    direction = line.get("dir", (1.0, 0.0))
+    return abs(direction[0]) < 0.7
+
+
 _INLINE_BULLETS = (chr(0x2022), chr(0x25AA), chr(0x25E6), chr(0x25CF))  # run-in bullet glyphs
 
 
@@ -453,6 +459,14 @@ class PDFReader:
         page_height: float,
     ) -> list[_Line]:
         collected: list[_Line] = []
+        # Rotated margin text (the arXiv stamp, "Preprint" banners) is not part of the reading
+        # flow and its large font made it a heading. It is dropped when horizontal text clearly
+        # dominates the page; a fully rotated (landscape) page keeps everything.
+        amount = {True: 0, False: 0}
+        for block in blocks:
+            for line in block["lines"]:
+                amount[_is_rotated(line)] += sum(len(s["text"].strip()) for s in line["spans"])
+        drop_rotated = amount[True] > 0 and amount[False] >= 3 * amount[True]
         for index, block in enumerate(blocks):
             x0, y0, x1, y1 = block["bbox"]
             cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
@@ -460,7 +474,7 @@ class PDFReader:
                 continue
             for line in block["lines"]:
                 visible = [s for s in line["spans"] if s["text"].strip()]
-                if not visible:
+                if not visible or (drop_rotated and _is_rotated(line)):
                     continue
                 spans = [
                     _Span(s["text"].strip(), s.get("font", ""), s["bbox"][0], s["bbox"][2])
@@ -468,6 +482,9 @@ class PDFReader:
                 ]
                 text = "".join(s["text"] for s in line["spans"]).strip()
                 lx0, ly0, lx1, ly1 = line["bbox"]
+                lcx, lcy = (lx0 + lx1) / 2, (ly0 + ly1) / 2
+                if any(ex[0] <= lcx <= ex[2] and ex[1] <= lcy <= ex[3] for ex in excluded):
+                    continue  # a caption or figure label sharing a text block with prose
                 if running and running.matches(text, ly0, page_height):
                     continue
                 if _TOC_LEADER.search(text):  # table-of-contents row: navigation, not content

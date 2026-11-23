@@ -1,5 +1,22 @@
 # Chunking Layer: Architecture, Implementation and Integration Notes
 
+> **STATUS: HISTORICAL (superseded in part, banner added 2026-11-15).** Kept for design context: it records the
+> chunking architecture as first built (class split, SOLID rationale, integration plan). The text below is unchanged.
+> The current single source of truth is [`project_context.md`](project_context.md). Outdated here:
+> - **Chunk ID format** `{doc_id}-{ordinal:05d}-{hash8}` and §4 note 6 ("inserting a section early shifts later ids"):
+>   replaced in chunker 1.3.0 by content ids `c-{hash12}` / `p-{hash12}` that survive edits (E2E-08) - see
+>   project_context.md §3.2 and §5, and [`answer_layer.md`](answer_layer.md) §1.
+> - **Chunker version** (implied 1.0.0): current is **1.3.0** - project_context.md §3.2.
+> - **Schema version** 2.x as "2.0": current is **2.1** (figure fields) - project_context.md §3.1.
+> - **Figure chunks**: the `figure` chunk kind (chunker 1.2.0) is not described here - project_context.md §3.8.
+> - **Embedding and vector store** (§5.1, §5.2, §7 "Not yet built", "sentence-transformers/torch not installed"):
+>   `BgeEmbedder` and `ChromaVectorStore` are built and tested - project_context.md §3.3 and §3.4.
+> - **Retrieval and reranking** (§7 "not yet built"): built, with an optional cross-encoder reranker and a calibrated
+>   relevance policy - project_context.md §3.5.
+> - **Prompt builder / answer layer** (§7 "not yet built"): built (MVP) and evaluated on one real model
+>   (Qwen2.5-3B) - project_context.md §3.10 and §11.
+> - **Test counts** ("215 tests"): see project_context.md §6 for the current verified figures.
+
 Companion to `chunking_design_spec.md` (rules) - this file describes the code in `ai/chunking/` as built.
 Status: implemented, 215 tests green (whole repository), validated on schema 2.0 documents from the real ingestion pipeline.
 

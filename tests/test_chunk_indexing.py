@@ -86,7 +86,7 @@ class ReingestionTests(IndexingTestCase):
         self.assertEqual(set(self.ids()), {c.vector_id for c in new})
         self.assertEqual(self.store.count(COLLECTION), 3)
 
-    def test_inserting_a_section_shifts_ids_but_reuses_embeddings(self) -> None:
+    def test_inserting_a_section_keeps_the_ids_of_the_others(self) -> None:
         old = make_chunks(section("A", "a"), section("B", "b"), section("C", "c"))
         self.service.index(old, document_uid="doc-1")
         before = len(self.embedder.texts_embedded)
@@ -94,8 +94,9 @@ class ReingestionTests(IndexingTestCase):
         report = self.service.index(new, document_uid="doc-1")
 
         self.assertEqual(report.embedded, 1)          # only the new section
-        self.assertEqual(report.reused, 3)            # the shifted ones keep their vectors
-        self.assertEqual(report.deleted, 3)           # their old ids are retired
+        self.assertEqual(report.reused, 0)            # ids do not depend on position: nothing is re-keyed
+        self.assertEqual(report.unchanged + report.refreshed, 3)  # the others keep id and vector (metadata refreshed)
+        self.assertEqual(report.deleted, 0)           # and nothing is retired
         self.assertEqual(len(self.embedder.texts_embedded) - before, 1)
         self.assertEqual(set(self.ids()), {c.vector_id for c in new})
         self.assertEqual(self.store.count(COLLECTION), 4)

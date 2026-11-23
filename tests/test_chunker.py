@@ -323,7 +323,7 @@ class IdentityTests(unittest.TestCase):
     def test_chunk_id_format_and_vector_id(self) -> None:
         chunk = chunker().chunk(build([H("A"), Pg(sentences(2))]), CTX)[0]
 
-        self.assertRegex(chunk.chunk_id, r"^d0c0000000000001-00000-[0-9a-f]{8}$")
+        self.assertRegex(chunk.chunk_id, r"^c-[0-9a-f]{12}$")  # content-addressed, no file hash, no position
         self.assertEqual(chunk.vector_id, f"doc-1:{chunk.chunk_id}")
 
     def test_chroma_metadata_is_flat_scalars(self) -> None:

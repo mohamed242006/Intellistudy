@@ -1,0 +1,2760 @@
+{
+ "description": "Hand labels for the figure candidates detected in real PDFs (before selection). label=keep means a chart / diagram / scientific figure worth understanding; skip means text fragments, code screenshots that OCR handles, decorative boxes or slices of a larger figure. Match detections by page + IoU.",
+ "annotations": [
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 6,
+   "bbox": [
+    228.0,
+    247.8,
+    731.5,
+    521.1
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 8,
+   "bbox": [
+    91.2,
+    180.7,
+    652.8,
+    493.4
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 8,
+   "bbox": [
+    419.2,
+    189.5,
+    651.8,
+    215.9
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "slice of a slide title rendered as an image"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 9,
+   "bbox": [
+    89.2,
+    183.1,
+    665.2,
+    475.7
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 10,
+   "bbox": [
+    87.6,
+    191.0,
+    706.2,
+    493.4
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 10,
+   "bbox": [
+    480.0,
+    45.4,
+    669.9,
+    347.8
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "text fragment"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 10,
+   "bbox": [
+    719.2,
+    144.0,
+    947.2,
+    497.0
+   ],
+   "kind": "vector_region",
+   "label": "skip",
+   "caption": "",
+   "note": "decorative text box"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 11,
+   "bbox": [
+    88.8,
+    198.1,
+    689.6,
+    500.5
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 11,
+   "bbox": [
+    508.7,
+    118.4,
+    655.6,
+    420.8
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "text fragment"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 12,
+   "bbox": [
+    93.6,
+    191.0,
+    684.6,
+    493.4
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 12,
+   "bbox": [
+    516.0,
+    91.1,
+    660.1,
+    393.8
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "text fragment"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 13,
+   "bbox": [
+    12.8,
+    120.4,
+    948.0,
+    505.9
+   ],
+   "kind": "vector_region",
+   "label": "skip",
+   "caption": "",
+   "note": "table (handled as a table)"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 17,
+   "bbox": [
+    66.0,
+    271.1,
+    894.0,
+    343.1
+   ],
+   "kind": "vector_region",
+   "label": "skip",
+   "caption": "",
+   "note": "text box"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 18,
+   "bbox": [
+    608.9,
+    386.0,
+    860.0,
+    529.2
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "text-in-image, OCR is sufficient"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 18,
+   "bbox": [
+    715.4,
+    393.8,
+    855.8,
+    524.3
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "partial duplicate of 13"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 20,
+   "bbox": [
+    789.1,
+    3.7,
+    954.7,
+    141.0
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "text-in-image, OCR is sufficient"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 24,
+   "bbox": [
+    105.6,
+    151.1,
+    854.4,
+    440.4
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 24,
+   "bbox": [
+    105.7,
+    439.1,
+    847.7,
+    488.8
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "text strip"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 24,
+   "bbox": [
+    105.6,
+    440.4,
+    732.4,
+    534.0
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "text strip"
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 26,
+   "bbox": [
+    510.2,
+    143.8,
+    945.1,
+    359.8
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 28,
+   "bbox": [
+    355.6,
+    142.6,
+    931.6,
+    486.4
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 29,
+   "bbox": [
+    353.6,
+    143.8,
+    925.9,
+    489.4
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 30,
+   "bbox": [
+    355.1,
+    143.8,
+    923.9,
+    498.5
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/1-Introduction to Aspect-Oriented Software Systems.pdf",
+   "page": 32,
+   "bbox": [
+    440.8,
+    139.2,
+    944.8,
+    507.4
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 5,
+   "bbox": [
+    341.4,
+    192.5,
+    952.9,
+    437.7
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 9,
+   "bbox": [
+    364.1,
+    148.8,
+    940.1,
+    508.2
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 11,
+   "bbox": [
+    312.6,
+    337.0,
+    429.4,
+    484.2
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "fragment of the diagram on the same slide"
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 11,
+   "bbox": [
+    318.2,
+    332.4,
+    409.3,
+    392.0
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "fragment"
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 11,
+   "bbox": [
+    440.0,
+    337.0,
+    590.3,
+    484.2
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "fragment"
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 11,
+   "bbox": [
+    474.6,
+    332.4,
+    565.7,
+    392.0
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "fragment"
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 11,
+   "bbox": [
+    16.3,
+    143.8,
+    942.5,
+    494.8
+   ],
+   "kind": "vector_region",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 12,
+   "bbox": [
+    344.4,
+    143.8,
+    942.0,
+    435.2
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 13,
+   "bbox": [
+    120.0,
+    125.9,
+    825.0,
+    485.0
+   ],
+   "kind": "vector_region",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 14,
+   "bbox": [
+    63.0,
+    125.9,
+    825.0,
+    512.9
+   ],
+   "kind": "vector_region",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 15,
+   "bbox": [
+    465.4,
+    147.6,
+    939.0,
+    520.7
+   ],
+   "kind": "vector_region",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 16,
+   "bbox": [
+    628.9,
+    123.7,
+    937.9,
+    481.8
+   ],
+   "kind": "vector_region",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 17,
+   "bbox": [
+    66.0,
+    143.8,
+    670.8,
+    529.2
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "code screenshot, OCR is sufficient"
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 17,
+   "bbox": [
+    474.4,
+    328.9,
+    878.6,
+    534.9
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 18,
+   "bbox": [
+    104.5,
+    147.2,
+    855.5,
+    521.6
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "code screenshot with numbered annotations"
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 20,
+   "bbox": [
+    528.0,
+    112.2,
+    758.4,
+    277.0
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 20,
+   "bbox": [
+    525.0,
+    220.4,
+    940.9,
+    528.3
+   ],
+   "kind": "vector_region",
+   "label": "skip",
+   "caption": "",
+   "note": "cropped fragment of 15"
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 21,
+   "bbox": [
+    138.0,
+    143.8,
+    822.0,
+    531.6
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "code screenshot"
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 22,
+   "bbox": [
+    524.4,
+    365.9,
+    754.8,
+    530.6
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 22,
+   "bbox": [
+    524.5,
+    116.8,
+    937.3,
+    374.2
+   ],
+   "kind": "vector_region",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 24,
+   "bbox": [
+    159.6,
+    143.8,
+    800.4,
+    523.9
+   ],
+   "kind": "raster",
+   "label": "skip",
+   "caption": "",
+   "note": "code screenshot"
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 29,
+   "bbox": [
+    62.4,
+    143.8,
+    896.9,
+    487.2
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 32,
+   "bbox": [
+    145.2,
+    143.8,
+    814.8,
+    522.8
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/2-Concepts of Aspect-Oriented Software Development.pdf",
+   "page": 34,
+   "bbox": [
+    24.6,
+    118.9,
+    930.8,
+    524.4
+   ],
+   "kind": "vector_region",
+   "label": "skip",
+   "caption": "",
+   "note": "mostly code"
+  },
+  {
+   "file": "data/uploads/PDFs/hard_PDF_1.pdf",
+   "page": 7,
+   "bbox": [
+    108.6,
+    156.2,
+    257.0,
+    214.8
+   ],
+   "kind": "vector_region",
+   "label": "keep",
+   "caption": "Figure 1",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/PDFs/hard_PDF_1.pdf",
+   "page": 8,
+   "bbox": [
+    66.3,
+    241.3,
+    286.8,
+    405.7
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "Figure 2",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/PDFs/hard_PDF_1.pdf",
+   "page": 8,
+   "bbox": [
+    329.3,
+    52.1,
+    549.8,
+    216.4
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "Figure 3",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/PDFs/hard_PDF_1.pdf",
+   "page": 8,
+   "bbox": [
+    66.3,
+    52.1,
+    286.8,
+    216.5
+   ],
+   "kind": "raster",
+   "label": "keep",
+   "caption": "",
+   "note": ""
+  }
+ ],
+ "pptx_annotations": [
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 1,
+   "k": 0,
+   "size": [
+    1916,
+    2500
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 7,
+   "k": 0,
+   "size": [
+    244,
+    294
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 11,
+   "k": 0,
+   "size": [
+    114,
+    119
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 11,
+   "k": 1,
+   "size": [
+    187,
+    171
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 11,
+   "k": 2,
+   "size": [
+    116,
+    122
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 11,
+   "k": 3,
+   "size": [
+    187,
+    171
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 11,
+   "k": 4,
+   "size": [
+    161,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 11,
+   "k": 5,
+   "size": [
+    147,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 11,
+   "k": 6,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 11,
+   "k": 7,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 11,
+   "k": 8,
+   "size": [
+    2006,
+    1561
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 12,
+   "k": 0,
+   "size": [
+    114,
+    119
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 12,
+   "k": 1,
+   "size": [
+    187,
+    171
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 12,
+   "k": 2,
+   "size": [
+    116,
+    122
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 12,
+   "k": 3,
+   "size": [
+    187,
+    171
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 12,
+   "k": 4,
+   "size": [
+    161,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 12,
+   "k": 5,
+   "size": [
+    147,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 12,
+   "k": 6,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 12,
+   "k": 7,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 12,
+   "k": 8,
+   "size": [
+    2006,
+    1561
+   ],
+   "label": "skip",
+   "note": "duplicate of the network diagram on slide 11 (slide build)"
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 14,
+   "k": 0,
+   "size": [
+    114,
+    119
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 14,
+   "k": 1,
+   "size": [
+    187,
+    171
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 14,
+   "k": 2,
+   "size": [
+    116,
+    122
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 14,
+   "k": 3,
+   "size": [
+    187,
+    171
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 14,
+   "k": 4,
+   "size": [
+    161,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 14,
+   "k": 5,
+   "size": [
+    147,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 14,
+   "k": 6,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 14,
+   "k": 7,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 14,
+   "k": 8,
+   "size": [
+    2006,
+    1561
+   ],
+   "label": "skip",
+   "note": "duplicate of the network diagram on slide 11 (slide build)"
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 15,
+   "k": 0,
+   "size": [
+    114,
+    119
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 15,
+   "k": 1,
+   "size": [
+    187,
+    171
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 15,
+   "k": 2,
+   "size": [
+    116,
+    122
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 15,
+   "k": 3,
+   "size": [
+    187,
+    171
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 15,
+   "k": 4,
+   "size": [
+    161,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 15,
+   "k": 5,
+   "size": [
+    147,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 15,
+   "k": 6,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 15,
+   "k": 7,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 15,
+   "k": 8,
+   "size": [
+    2006,
+    1561
+   ],
+   "label": "skip",
+   "note": "duplicate of the network diagram on slide 11 (slide build)"
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 16,
+   "k": 0,
+   "size": [
+    114,
+    119
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 16,
+   "k": 1,
+   "size": [
+    187,
+    171
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 16,
+   "k": 2,
+   "size": [
+    116,
+    122
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 16,
+   "k": 3,
+   "size": [
+    187,
+    171
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 16,
+   "k": 4,
+   "size": [
+    161,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 16,
+   "k": 5,
+   "size": [
+    147,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 16,
+   "k": 6,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 16,
+   "k": 7,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 16,
+   "k": 8,
+   "size": [
+    2006,
+    1561
+   ],
+   "label": "skip",
+   "note": "duplicate of the network diagram on slide 11 (slide build)"
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 17,
+   "k": 0,
+   "size": [
+    270,
+    296
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 17,
+   "k": 1,
+   "size": [
+    114,
+    119
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 17,
+   "k": 2,
+   "size": [
+    187,
+    171
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 17,
+   "k": 3,
+   "size": [
+    161,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 17,
+   "k": 4,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 17,
+   "k": 5,
+   "size": [
+    86,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 17,
+   "k": 6,
+   "size": [
+    2006,
+    1561
+   ],
+   "label": "skip",
+   "note": "duplicate of the network diagram on slide 11 (slide build)"
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 20,
+   "k": 0,
+   "size": [
+    866,
+    522
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 21,
+   "k": 0,
+   "size": [
+    676,
+    375
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 22,
+   "k": 0,
+   "size": [
+    658,
+    253
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 23,
+   "k": 0,
+   "size": [
+    640,
+    264
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 26,
+   "k": 0,
+   "size": [
+    402,
+    295
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 01 - Introduction.pptx",
+   "slide": 27,
+   "k": 0,
+   "size": [
+    500,
+    335
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 1,
+   "k": 0,
+   "size": [
+    2060,
+    2688
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 4,
+   "k": 0,
+   "size": [
+    244,
+    294
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 5,
+   "k": 0,
+   "size": [
+    244,
+    294
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 6,
+   "k": 0,
+   "size": [
+    517,
+    377
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 8,
+   "k": 0,
+   "size": [
+    162,
+    99
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 8,
+   "k": 1,
+   "size": [
+    605,
+    282
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 8,
+   "k": 2,
+   "size": [
+    605,
+    282
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 8,
+   "k": 3,
+   "size": [
+    605,
+    282
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 10,
+   "k": 0,
+   "size": [
+    162,
+    99
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 10,
+   "k": 1,
+   "size": [
+    244,
+    294
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 12,
+   "k": 0,
+   "size": [
+    232,
+    129
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 14,
+   "k": 0,
+   "size": [
+    244,
+    294
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 14,
+   "k": 1,
+   "size": [
+    560,
+    271
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 15,
+   "k": 0,
+   "size": [
+    187,
+    128
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 15,
+   "k": 1,
+   "size": [
+    250,
+    152
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 02 - Classical Encryption Techniques I.pptx",
+   "slide": 17,
+   "k": 0,
+   "size": [
+    735,
+    552
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 03 - Classical Encryption Techniques II.pptx",
+   "slide": 1,
+   "k": 0,
+   "size": [
+    2060,
+    2688
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 03 - Classical Encryption Techniques II.pptx",
+   "slide": 4,
+   "k": 0,
+   "size": [
+    1027,
+    596
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 03 - Classical Encryption Techniques II.pptx",
+   "slide": 6,
+   "k": 0,
+   "size": [
+    1027,
+    596
+   ],
+   "label": "skip",
+   "note": "duplicate of the Vigenere tableau on slide 4"
+  },
+  {
+   "file": "data/uploads/pptx/Section 03 - Classical Encryption Techniques II.pptx",
+   "slide": 7,
+   "k": 0,
+   "size": [
+    244,
+    294
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 03 - Classical Encryption Techniques II.pptx",
+   "slide": 8,
+   "k": 0,
+   "size": [
+    1027,
+    596
+   ],
+   "label": "skip",
+   "note": "duplicate of the Vigenere tableau on slide 4"
+  },
+  {
+   "file": "data/uploads/pptx/Section 03 - Classical Encryption Techniques II.pptx",
+   "slide": 9,
+   "k": 0,
+   "size": [
+    244,
+    294
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 03 - Classical Encryption Techniques II.pptx",
+   "slide": 10,
+   "k": 0,
+   "size": [
+    1027,
+    596
+   ],
+   "label": "skip",
+   "note": "duplicate of the Vigenere tableau on slide 4"
+  },
+  {
+   "file": "data/uploads/pptx/Section 03 - Classical Encryption Techniques II.pptx",
+   "slide": 11,
+   "k": 0,
+   "size": [
+    244,
+    294
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 03 - Classical Encryption Techniques II.pptx",
+   "slide": 13,
+   "k": 0,
+   "size": [
+    244,
+    294
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 03 - Classical Encryption Techniques II.pptx",
+   "slide": 14,
+   "k": 0,
+   "size": [
+    244,
+    294
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Section 03 - Classical Encryption Techniques II.pptx",
+   "slide": 21,
+   "k": 0,
+   "size": [
+    735,
+    552
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 18,
+   "k": 3,
+   "size": [
+    262,
+    258
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 19,
+   "k": 3,
+   "size": [
+    262,
+    258
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 19,
+   "k": 4,
+   "size": [
+    208,
+    271
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 19,
+   "k": 5,
+   "size": [
+    135,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 20,
+   "k": 3,
+   "size": [
+    284,
+    273
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 26,
+   "k": 3,
+   "size": [
+    129,
+    141
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 26,
+   "k": 4,
+   "size": [
+    203,
+    272
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 27,
+   "k": 3,
+   "size": [
+    324,
+    273
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 27,
+   "k": 4,
+   "size": [
+    350,
+    148
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 33,
+   "k": 3,
+   "size": [
+    361,
+    269
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 47,
+   "k": 3,
+   "size": [
+    476,
+    384
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 48,
+   "k": 3,
+   "size": [
+    272,
+    273
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 53,
+   "k": 3,
+   "size": [
+    104,
+    164
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 61,
+   "k": 3,
+   "size": [
+    143,
+    142
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 61,
+   "k": 4,
+   "size": [
+    235,
+    273
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 73,
+   "k": 3,
+   "size": [
+    112,
+    141
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 75,
+   "k": 3,
+   "size": [
+    324,
+    273
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 76,
+   "k": 3,
+   "size": [
+    95,
+    100
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 76,
+   "k": 4,
+   "size": [
+    361,
+    269
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 77,
+   "k": 3,
+   "size": [
+    135,
+    134
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 79,
+   "k": 3,
+   "size": [
+    277,
+    257
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 79,
+   "k": 4,
+   "size": [
+    219,
+    273
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 82,
+   "k": 3,
+   "size": [
+    184,
+    194
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SPE_l1.pptx",
+   "slide": 82,
+   "k": 4,
+   "size": [
+    143,
+    69
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 1,
+   "k": 0,
+   "size": [
+    1648,
+    2478
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 2,
+   "k": 0,
+   "size": [
+    417,
+    418
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 3,
+   "k": 0,
+   "size": [
+    626,
+    417
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 4,
+   "k": 0,
+   "size": [
+    626,
+    351
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 5,
+   "k": 0,
+   "size": [
+    417,
+    626
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 5,
+   "k": 1,
+   "size": [
+    512,
+    512
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 5,
+   "k": 2,
+   "size": [
+    512,
+    512
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 6,
+   "k": 0,
+   "size": [
+    626,
+    626
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 6,
+   "k": 1,
+   "size": [
+    512,
+    512
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 6,
+   "k": 2,
+   "size": [
+    512,
+    512
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 6,
+   "k": 3,
+   "size": [
+    512,
+    512
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 7,
+   "k": 0,
+   "size": [
+    3715,
+    2477
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 7,
+   "k": 1,
+   "size": [
+    3712,
+    2476
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 8,
+   "k": 0,
+   "size": [
+    626,
+    418
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 8,
+   "k": 1,
+   "size": [
+    626,
+    417
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 8,
+   "k": 2,
+   "size": [
+    626,
+    417
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 8,
+   "k": 3,
+   "size": [
+    550,
+    250
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 8,
+   "k": 4,
+   "size": [
+    626,
+    417
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 9,
+   "k": 0,
+   "size": [
+    2000,
+    1333
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 9,
+   "k": 1,
+   "size": [
+    66,
+    66
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 9,
+   "k": 2,
+   "size": [
+    69,
+    69
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 10,
+   "k": 0,
+   "size": [
+    1656,
+    2479
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 16,
+   "k": 1,
+   "size": [
+    121,
+    86
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 16,
+   "k": 2,
+   "size": [
+    150,
+    84
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 16,
+   "k": 3,
+   "size": [
+    106,
+    106
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 16,
+   "k": 4,
+   "size": [
+    106,
+    105
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/SlideEgg_401236-Research University.pptx",
+   "slide": 16,
+   "k": 5,
+   "size": [
+    81,
+    79
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 14,
+   "k": 0,
+   "size": [
+    2048,
+    1363
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 15,
+   "k": 0,
+   "size": [
+    1320,
+    2048
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 19,
+   "k": 0,
+   "size": [
+    960,
+    540
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 20,
+   "k": 0,
+   "size": [
+    1366,
+    2048
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 21,
+   "k": 0,
+   "size": [
+    1366,
+    2048
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 26,
+   "k": 0,
+   "size": [
+    1200,
+    742
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 33,
+   "k": 0,
+   "size": [
+    1200,
+    742
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 34,
+   "k": 0,
+   "size": [
+    2048,
+    1365
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 34,
+   "k": 1,
+   "size": [
+    2048,
+    1367
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 42,
+   "k": 0,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 42,
+   "k": 1,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 42,
+   "k": 2,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 42,
+   "k": 3,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 42,
+   "k": 4,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Statistical Methods in Public Health - Master of Science in Biostatistics by Slidesgo.pptx",
+   "slide": 56,
+   "k": 0,
+   "size": [
+    1459,
+    584
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/University Research Poster.pptx",
+   "slide": 1,
+   "k": 0,
+   "size": [
+    335,
+    269
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/University Research Poster.pptx",
+   "slide": 1,
+   "k": 1,
+   "size": [
+    300,
+    263
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/University Research Poster.pptx",
+   "slide": 3,
+   "k": 0,
+   "size": [
+    888,
+    222
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 15,
+   "k": 0,
+   "size": [
+    2048,
+    1363
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 16,
+   "k": 0,
+   "size": [
+    1365,
+    2048
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 21,
+   "k": 0,
+   "size": [
+    960,
+    540
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 22,
+   "k": 0,
+   "size": [
+    960,
+    540
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 23,
+   "k": 0,
+   "size": [
+    960,
+    540
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 29,
+   "k": 0,
+   "size": [
+    1004,
+    940
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 32,
+   "k": 0,
+   "size": [
+    1365,
+    2048
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 32,
+   "k": 1,
+   "size": [
+    2048,
+    1365
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 39,
+   "k": 0,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 39,
+   "k": 1,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 39,
+   "k": 2,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 39,
+   "k": 3,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 39,
+   "k": 4,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Pathophysiology by Slidesgo.pptx",
+   "slide": 53,
+   "k": 0,
+   "size": [
+    1459,
+    584
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 14,
+   "k": 0,
+   "size": [
+    2048,
+    1365
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 15,
+   "k": 0,
+   "size": [
+    1365,
+    2048
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 19,
+   "k": 0,
+   "size": [
+    960,
+    540
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 20,
+   "k": 0,
+   "size": [
+    960,
+    540
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 21,
+   "k": 0,
+   "size": [
+    960,
+    540
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 24,
+   "k": 0,
+   "size": [
+    2048,
+    1269
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 26,
+   "k": 0,
+   "size": [
+    1070,
+    742
+   ],
+   "label": "keep",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 34,
+   "k": 0,
+   "size": [
+    2048,
+    1365
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 42,
+   "k": 0,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 42,
+   "k": 1,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 42,
+   "k": 2,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 42,
+   "k": 3,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 42,
+   "k": 4,
+   "size": [
+    2000,
+    2000
+   ],
+   "label": "skip",
+   "note": ""
+  },
+  {
+   "file": "data/uploads/pptx/Physiotherapy Major for College_ Musculoskeletal System by Slidesgo.pptx",
+   "slide": 56,
+   "k": 0,
+   "size": [
+    1459,
+    584
+   ],
+   "label": "skip",
+   "note": ""
+  }
+ ],
+ "pptx_note": "PPTX pictures >=64 px on the short side (smaller ones are rejected by a hard rule and not annotated). Key = slide + k-th picture of the slide in reading order. A large picture repeated on several slides is one figure: first occurrence keep, later ones skip (duplicate); small repeated pictures are template furniture."
+}

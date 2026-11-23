@@ -14,7 +14,7 @@ MODEL_MAX_TOKENS = 512
 #: bge models want this instruction on *queries* (never on documents).
 QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
-CHUNKER_VERSION = "1.0.0"
+CHUNKER_VERSION = "1.3.0"
 TOMBSTONE_RETENTION_DAYS = 7
 
 

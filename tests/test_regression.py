@@ -117,7 +117,7 @@ class Reg12StaleMetadataTests(unittest.TestCase):
                 keys = [f"{c.document_uid}:{c.parent_id}" for c in second.children]
                 self.assertEqual(len(parents.get_many(keys, user_id="u1", course_id="c1")), len(second.parents))
                 hits = RetrievalService(embedder, store, parents).search(
-                    "dup0_0 dup1_0", user_id="u1", course_id="c1", k=5)
+                    "dup0_0 dup1_0", user_id="u1", course_id="c1", k=5, assess_relevance=False)
                 self.assertEqual(hits.warnings, [])
                 self.assertTrue(all(hits.parent_for(h) is not None for h in hits.hits))
 

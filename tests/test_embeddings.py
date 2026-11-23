@@ -235,7 +235,8 @@ class EmbeddingReuseTests(unittest.TestCase):
 class HashStabilityTests(unittest.TestCase):
     def test_golden_values_catch_accidental_algorithm_changes(self) -> None:
         self.assertEqual(content_hash("hello world"), "2aae6c35c94fcfb4")  # sha1("hello world")[:16]
-        self.assertEqual(make_chunk_id("d0c0000000000001", 7, "2aae6c35c94fcfb4"), "d0c0000000000001-00007-2aae6c35")
+        self.assertEqual(make_chunk_id("2aae6c35c94fcfb4"), "c-2aae6c35c94f")
+        self.assertEqual(make_chunk_id("2aae6c35c94fcfb4", 2), "c-2aae6c35c94f.2")
         self.assertEqual(vector_id("uid", "chunk"), "uid:chunk")
 
     def test_whitespace_and_unicode_normalisation(self) -> None:

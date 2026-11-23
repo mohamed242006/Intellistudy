@@ -18,6 +18,7 @@ from io import BytesIO
 
 from PIL import Image
 
+from ai.ingestion.figure_selection import apply_stats
 from ai.ingestion.models import ImageData, PageType, TableData
 from ai.ingestion.ocr_processor import OCRProcessor
 
@@ -147,6 +148,10 @@ def ocr_image_blob(
         return f"decode failed ({exc})"
 
     image_data.width, image_data.height = pil_image.size
+    try:  # statistics for the figure selection layer; never worth failing an image over
+        apply_stats(image_data, pil_image)
+    except Exception as exc:
+        logger.debug("%s: image statistics unavailable: %s", label, exc)
 
     try:
         result = ocr.process_image(pil_image)

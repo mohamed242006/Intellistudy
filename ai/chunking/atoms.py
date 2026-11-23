@@ -19,11 +19,11 @@ from ai.chunking.config import ChunkConfig
 from ai.chunking.render import to_key_value, to_markdown
 from ai.chunking.text import TextSplitter
 from ai.chunking.tokens import TokenCounter
-from ai.ingestion.models import Block, BlockType, PageContent
+from ai.ingestion.models import Block, BlockType, FigureData, PageContent
 from ai.ingestion.structure import render_block
 
 #: Atoms that always form a chunk of their own (never merged, never overlapped).
-ISOLATED_KINDS = frozenset({"table", "notes", "chart"})
+ISOLATED_KINDS = frozenset({"table", "notes", "chart", "figure"})
 _LABELLED_KINDS = ("image_ocr", "notes", "chart")
 
 
@@ -40,6 +40,7 @@ class Atom:
     table_index: int | None = None
     table_part: int | None = None
     table_parts: int | None = None
+    figure: FigureData | None = None  # figure atoms: the source record (caption, mentions ...)
 
 
 class AtomBuilder:
@@ -74,10 +75,55 @@ class AtomBuilder:
                 atoms.append(self._labelled("image_ocr", "[Image text]", block))
             elif kind is BlockType.NOTES:
                 atoms.append(self._labelled("notes", "[Speaker Notes]", block))
+            elif kind is BlockType.FIGURE:
+                atoms.append(self._figure_atom(block, pages))
             elif kind is BlockType.TABLE:
                 atoms.append(self._table_atom(block, pages, atoms))
             i += 1
         return atoms
+
+    def _figure_atom(self, block: Block, pages: dict[int, PageContent]) -> Atom:
+        """Caption, text inside the figure, the sentences that cite it and (later) a generated description.
+
+        Fixed template so the answer layer can tell source text from generated text. Every part is clipped
+        so the atom always fits one chunk: a figure is never split.
+        """
+        figure = None
+        page = pages.get(block.page_number)
+        if page is not None and block.ref_index is not None and 0 <= block.ref_index < len(page.figures):
+            figure = page.figures[block.ref_index]
+        if figure is None:  # figure record missing: use the block text as it is
+            text = self._clip(f"[Figure]\n{block.text}", self._config.target_tokens)
+            return Atom("figure", [block], text, text, self._count(text))
+        budget = self._config.target_tokens
+        parts = [f"[{figure.label or 'Figure'}]" + (f" (page {figure.page_number})" if figure.page_number else "")]
+        if figure.caption:
+            parts.append(self._clip(figure.caption if figure.caption.lower().startswith("fig") else f"Caption: {figure.caption}", budget // 3))
+        elif figure.alt_text:
+            parts.append(self._clip(f"Alt text: {figure.alt_text}", budget // 6))
+        inner = figure.inner_text or figure.ocr_text
+        if inner:
+            parts.append(self._clip(f"Text in figure: {inner}", budget // 3))
+        for sentence in figure.mentions[:2]:
+            parts.append(self._clip(f'Discussed in text: "{sentence}"', budget // 8))
+        if figure.description and figure.description_status == "done":
+            parts.append(self._clip(f"Generated description (AI-generated, may contain errors): {figure.description}", budget // 4))
+        text = "\n".join(parts)
+        return Atom("figure", [block], text, text, self._count(text), figure=figure)
+
+    def _clip(self, text: str, max_tokens: int) -> str:
+        """``text`` cut at a word boundary to at most ``max_tokens`` (with an ellipsis when cut)."""
+        if self._count(text) <= max_tokens:
+            return text
+        words = text.split()
+        low, high = 1, len(words)
+        while low < high:  # longest prefix that fits
+            mid = (low + high + 1) // 2
+            if self._count(" ".join(words[:mid]) + " ...") <= max_tokens:
+                low = mid
+            else:
+                high = mid - 1
+        return " ".join(words[:low]) + " ..."
 
     def _labelled(self, kind: str, label: str, block: Block) -> Atom:
         text = f"{label}\n{block.text}"
@@ -136,6 +182,8 @@ class AtomBuilder:
         cfg = self._config
         if atom.kind == "table":
             return self._split_table(atom)
+        if atom.kind == "figure":
+            return [atom]  # already clipped to fit; a figure is one retrievable unit
         if atom.tokens <= cfg.max_tokens - cfg.overlap_tokens:
             return [atom]
         if atom.kind == "list":

@@ -5,9 +5,13 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from ai.chunking.interfaces import ScoredRecord
 from ai.chunking.models import ParentChunk
+
+if TYPE_CHECKING:
+    from ai.retrieval.assessment import RelevanceAssessment
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +36,8 @@ class RetrievedChunk:
     user_id: str
     course_id: str
     metadata: Mapping[str, str | int | float | bool] = field(repr=False, default_factory=dict)
+    rerank_score: float | None = None  # cross-encoder score when a reranker ran (model-specific scale)
+    is_reference: bool = False  # bibliography chunk (ranked after body text unless the query asks for sources)
 
     @classmethod
     def from_record(cls, record: ScoredRecord) -> "RetrievedChunk":
@@ -78,6 +84,7 @@ class RetrievalResult:
     hits: list[RetrievedChunk] = field(default_factory=list)  # children, best first
     parents: list[ParentContext] = field(default_factory=list)  # context, ordered by best child
     warnings: list[str] = field(default_factory=list)
+    assessment: "RelevanceAssessment | None" = None  # advice for the answer layer; see ai/retrieval/assessment.py
 
     @property
     def is_empty(self) -> bool:

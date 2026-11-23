@@ -151,6 +151,10 @@ class ChildChunk(Chunk):
     table_parts: int | None
     embedding_model: str
     oversize: bool = False
+    figure_id: str | None = None  # figure chunks: stable id of the figure, label ("Figure 3") and kind
+    figure_label: str | None = None
+    figure_type: str | None = None
+    figure_kind: str | None = None
 
     def _metadata_without_record_hash(self) -> dict[str, MetaValue]:
         meta = self.base_metadata()
@@ -164,6 +168,15 @@ class ChildChunk(Chunk):
                 "embedding_model": self.embedding_model,
             }
         )
+        if self.figure_id is not None:
+            meta.update(
+                {
+                    "figure_id": self.figure_id,
+                    "figure_label": self.figure_label or "",
+                    "figure_type": self.figure_type or "unknown",
+                    "figure_kind": self.figure_kind or "",
+                }
+            )
         return meta
 
     @property

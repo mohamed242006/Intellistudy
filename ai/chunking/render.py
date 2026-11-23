@@ -9,8 +9,9 @@ from __future__ import annotations
 Rows = list[list[str]]
 
 
-def _cell(value: str) -> str:
-    return " ".join(str(value).replace("|", "/").split())
+def _cell(value: str, *, escape_pipe: bool = False) -> str:
+    text = " ".join(str(value).split())
+    return text.replace("|", "\\|") if escape_pipe else text
 
 
 def to_markdown(rows: Rows) -> str:
@@ -18,7 +19,7 @@ def to_markdown(rows: Rows) -> str:
     if not rows:
         return ""
     width = max(len(r) for r in rows)
-    padded = [[_cell(c) for c in r] + [""] * (width - len(r)) for r in rows]
+    padded = [[_cell(c, escape_pipe=True) for c in r] + [""] * (width - len(r)) for r in rows]
     lines = ["| " + " | ".join(padded[0]) + " |"]
     if len(padded) > 1:
         lines.append("| " + " | ".join(["---"] * width) + " |")

@@ -6,14 +6,9 @@ import dataclasses
 
 from ai.chunking.citation import block_ranges, citation_label
 from ai.chunking.config import ChunkConfig
-from ai.chunking.ids import content_hash
+from ai.chunking.ids import content_hash, make_parent_id
 from ai.chunking.models import BBoxEntry, ChildChunk, ParentChunk
 from ai.chunking.tokens import TokenCounter
-
-
-def parent_chunk_id(doc_id: str, ordinal: int, text_hash: str) -> str:
-    """``{doc_id}-P{ordinal:04d}-{hash8}`` - deterministic, distinct from child ids."""
-    return f"{doc_id}-P{ordinal:04d}-{text_hash[:8]}"
 
 
 class ParentBuilder:
@@ -31,8 +26,9 @@ class ParentBuilder:
         groups = self._group(children)
         parents: list[ParentChunk] = []
         linked: list[ChildChunk] = []
+        seen: dict[str, int] = {}
         for ordinal, group in enumerate(groups):
-            parent = self._parent(group, ordinal)
+            parent = self._parent(group, ordinal, seen)
             parents.append(parent)
             linked.extend(dataclasses.replace(c, parent_id=parent.chunk_id) for c in group)
         return parents, linked
@@ -57,10 +53,12 @@ class ParentBuilder:
             groups.append(current)
         return groups
 
-    def _parent(self, group: list[ChildChunk], ordinal: int) -> ParentChunk:
+    def _parent(self, group: list[ChildChunk], ordinal: int, seen: dict[str, int]) -> ParentChunk:
         first = group[0]
         text = "\n\n".join(c.text for c in group)
         text_hash = content_hash(text)
+        occurrence = seen.get(text_hash, 0)
+        seen[text_hash] = occurrence + 1
         orders = tuple(sorted({o for c in group for o in c.block_orders}))
         types: list[str] = []
         titles: list[str] = []
@@ -77,7 +75,7 @@ class ParentBuilder:
         confidence = min(c.confidence for c in group)
 
         return ParentChunk(
-            chunk_id=parent_chunk_id(first.doc_id, ordinal, text_hash),
+            chunk_id=make_parent_id(text_hash, occurrence),
             ordinal=ordinal,
             kind="section",
             text=text,

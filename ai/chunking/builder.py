@@ -17,7 +17,7 @@ from ai.chunking.models import BBoxEntry, ChildChunk, ChunkContext, ChunkReport
 from ai.chunking.sections import Section
 from ai.chunking.text import TextSplitter
 from ai.chunking.tokens import TokenCounter
-from ai.ingestion.models import BlockType, Document, PageContent
+from ai.ingestion.models import Block, BlockType, Document, PageContent
 
 
 @dataclass(slots=True)
@@ -30,6 +30,7 @@ class Draft:
     titles: list[str]
     page_start: int
     page_end: int
+    heading: Block | None = None  # the section's own heading block, for title lines after merging
 
     @property
     def tokens(self) -> int:
@@ -111,6 +112,8 @@ class ChunkBuilder:
         drafts: list[Draft] = []
         current: list[Atom] = []
         used = 0
+        first = section.blocks[0] if section.blocks else None
+        lead = first if first is not None and first.type is BlockType.HEADING else None
 
         def make(items: list[Atom]) -> Draft:
             pages_used = {b.page_number for a in items for b in a.blocks}
@@ -121,6 +124,7 @@ class ChunkBuilder:
                 titles=[section.head_path[-1]] if section.head_path else [],
                 page_start=min(pages_used),
                 page_end=max(pages_used),
+                heading=lead,
             )
 
         def flush() -> None:
@@ -150,10 +154,20 @@ class ChunkBuilder:
         return drafts
 
     # --------------------------------------------------------------- merging
+    def _title_atom(self, draft: Draft, common: tuple[str, ...]) -> Atom | None:
+        """``A > B`` line naming the part of ``draft``'s path that the merged chunk path lost."""
+        lost = draft.head_path[len(common):]
+        if not lost or draft.heading is None:
+            return None
+        title = " > ".join(lost)
+        return Atom("paragraph", [draft.heading], title, title, self._count(title))
+
     def _can_merge(self, a: Draft, b: Draft, unit: str) -> bool:
         if a.isolated or b.isolated or "image_ocr" in a.kinds or "image_ocr" in b.kinds:
             return False
-        if a.tokens + b.tokens > self._config.target_tokens:
+        common = _common_prefix(a.head_path, b.head_path)
+        extra = sum(t.tokens for t in (self._title_atom(a, common), self._title_atom(b, common)) if t is not None)
+        if a.tokens + b.tokens + extra > self._config.target_tokens:
             return False
         if unit == "slide" and a.page_end != b.page_start:
             return False
@@ -172,9 +186,19 @@ class ChunkBuilder:
                 prev = out[-1]
                 small = prev.tokens < cfg.min_tokens or draft.tokens < cfg.min_tokens
                 if small and self._can_merge(prev, draft, unit):
+                    common = _common_prefix(prev.head_path, draft.head_path)
+                    # the merged path shrinks to the common ancestor: keep each section's own
+                    # title in the text so it is still read, embedded and citable
+                    if len(prev.section_ids) == 1:
+                        lead = self._title_atom(prev, common)
+                        if lead is not None:
+                            prev.atoms.insert(0, lead)
+                    incoming = self._title_atom(draft, common)
+                    if incoming is not None:
+                        draft.atoms.insert(0, incoming)
                     prev.atoms.extend(draft.atoms)
                     prev.section_ids.extend(s for s in draft.section_ids if s not in prev.section_ids)
-                    prev.head_path = _common_prefix(prev.head_path, draft.head_path)
+                    prev.head_path = common
                     for title in draft.titles:
                         if title not in prev.titles:
                             prev.titles.append(title)
@@ -188,7 +212,7 @@ class ChunkBuilder:
     @staticmethod
     def _kind(draft: Draft) -> str:
         kinds = draft.kinds
-        for single in ("notes", "table", "chart", "image_ocr"):
+        for single in ("notes", "table", "chart", "image_ocr", "figure"):
             if kinds == {single}:
                 return single
         return "mixed" if ("image_ocr" in kinds or "table" in kinds) else "text"
@@ -260,10 +284,12 @@ class ChunkBuilder:
         deck = source.title or ""
         chunks: list[ChildChunk] = []
         previous: tuple[Draft, str] | None = None
+        seen_text: dict[str, int] = {}
 
         for ordinal, draft in enumerate(drafts):
             kind = self._kind(draft)
             table = draft.atoms[0] if kind == "table" and len(draft.atoms) == 1 else None
+            figure = draft.atoms[0].figure if kind == "figure" and len(draft.atoms) == 1 else None
             text = "\n\n".join(a.text for a in draft.atoms)
             body = "\n\n".join(a.embed for a in draft.atoms)
 
@@ -313,11 +339,13 @@ class ChunkBuilder:
 
             confidence, ocr_confidence = self._confidences(draft, pages, source.file_type)
             text_hash = content_hash(text)
+            occurrence = seen_text.get(text_hash, 0)
+            seen_text[text_hash] = occurrence + 1
             slide_no = draft.page_start if document.unit == "slide" else None
 
             chunks.append(
                 ChildChunk(
-                    chunk_id=make_chunk_id(source.doc_id, ordinal, text_hash),
+                    chunk_id=make_chunk_id(text_hash, occurrence),
                     ordinal=ordinal,
                     kind=kind,
                     text=text,
@@ -348,7 +376,10 @@ class ChunkBuilder:
                     block_ranges=block_ranges(orders),
                     block_types=tuple(block_types),
                     citation_label=citation_label(
-                        document.unit, draft.page_start, draft.page_end, draft.head_path
+                        document.unit,
+                        draft.page_start,
+                        draft.page_end,
+                        (*draft.head_path, figure.label or "Figure") if figure is not None else draft.head_path,
                     ),
                     bboxes=tuple(bboxes),
                     confidence=confidence,
@@ -368,6 +399,12 @@ class ChunkBuilder:
                     table_parts=table.table_parts if table is not None else None,
                     embedding_model=ctx.embedding_model,
                     oversize=oversize,
+                    figure_id=(
+                        f"{source.doc_id}-F{figure.page_number}.{figure.index}" if figure is not None else None
+                    ),
+                    figure_label=figure.label if figure is not None else None,
+                    figure_type=figure.figure_type if figure is not None else None,
+                    figure_kind=figure.kind if figure is not None else None,
                 )
             )
             previous = (draft, kind)

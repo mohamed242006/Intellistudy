@@ -1,5 +1,20 @@
 # Embedding, Vector Storage and Retrieval
 
+> **STATUS: HISTORICAL (superseded in part, banner added 2026-11-15).** Kept as the design record of the embedding,
+> Chroma and parent-child retrieval layers; the text below is unchanged and its architecture still holds. The current
+> single source of truth is [`project_context.md`](project_context.md). Outdated here:
+> - **Reranker status** (§G "No reranker"): an optional cross-encoder reranker (`ai/retrieval/rerank.py`), bibliography
+>   demotion and a calibrated, model-bound relevance assessment exist - project_context.md §3.5 and
+>   [`phase0_report.md`](phase0_report.md) §2.
+> - **Chunk ID format / re-ingestion wording** ("ordinals shifted" -> reuse): chunk ids are content-based
+>   `c-{hash12}` / `p-{hash12}` since chunker 1.3.0 - project_context.md §3.2 and §3.6.
+> - **Chunker version** (implied 1.x before 1.3.0) and **schema version** (2.0): current 1.3.0 and 2.1 -
+>   project_context.md §3.1-3.2. **Figure chunks** (`kind="figure"`) are indexed like other children - §3.8.
+> - **Embedding and vector-store status**: as described here and still current (BGE-small, one Chroma collection per
+>   model + chunker major, SQLite parents; PostgreSQL still not built) - project_context.md §3.3-3.4.
+> - **Answer layer and real-model evaluation**: not covered here - project_context.md §3.10 and §11.
+> - **Test counts** ("334 tests"): see project_context.md §6.
+
 Builds on `chunking_architecture.md`. Status: implemented; 334 tests pass (4 opt-in real-model tests skipped by default and passing when enabled), verified end to end on the real lecture PDFs with `BAAI/bge-small-en-v1.5`, ChromaDB 1.5 and SQLite.
 
 ## A. Indexing architecture

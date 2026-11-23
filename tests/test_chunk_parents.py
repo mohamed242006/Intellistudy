@@ -101,7 +101,7 @@ class ParentChildTests(unittest.TestCase):
         one, two = engine().run(self.doc(), CTX), engine().run(self.doc(), CTX)
 
         self.assertEqual([p.chunk_id for p in one.parents], [p.chunk_id for p in two.parents])
-        self.assertRegex(one.parents[0].chunk_id, r"^d0c0000000000001-P\d{4}-[0-9a-f]{8}$")
+        self.assertRegex(one.parents[0].chunk_id, r"^p-[0-9a-f]{12}$")
 
     def test_parent_ids_do_not_change_child_ids(self) -> None:
         small = engine().run(self.doc(), CTX)

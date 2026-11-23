@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Any
 
 #: Version of the canonical output schema (Document / PageContent / Block).
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "2.1"
 
 
 class IngestionError(Exception):
@@ -49,6 +49,7 @@ class BlockType(str, Enum):
     IMAGE_OCR = "image_ocr"
     CHART = "chart"
     NOTES = "notes"
+    FIGURE = "figure"  # a selected figure: caption + text inside it (+ later a generated description)
 
 
 @dataclass(slots=True)
@@ -150,6 +151,62 @@ class ImageData:
     ocr_confidence: float | None = None  # mean word confidence, 0-100
     ocr_applied: bool = False  # OCR was attempted on this image
     ocr_skipped_reason: str | None = None  # e.g. "too_small", "no_text", "low_confidence"
+    thumb_hash: str = ""  # 8x8 average hash: the same picture on several pages is a logo / template element
+    distinct_colors: int = 0  # colours in a 32x32 thumbnail after quantising (0 = not measured)
+    alt_text: str = ""  # author-supplied description (PPTX / DOCX), when present
+    dominant_fraction: float = -1.0  # share of the most common colour (flat backgrounds: diagrams, charts)
+    white_fraction: float = -1.0  # share of near-white pixels
+    edge_density: float = -1.0  # share of pixels on a strong edge (line art) in a 64x64 thumbnail
+
+
+@dataclass(slots=True)
+class FigureData:
+    """A figure the selection layer decided is worth understanding (chart, diagram, scientific figure ...).
+
+    Source text is kept apart from anything generated: ``caption`` and ``inner_text`` / ``ocr_text`` are the
+    author's words, ``description`` is reserved for a later model-generated summary and stays empty in Phase 0.
+    """
+
+    page_number: int
+    index: int  # position in PageContent.figures
+    kind: str  # raster | vector_region | caption_only | pptx_picture | docx_inline
+    bbox: tuple[float, float, float, float] | None = None
+    label: str = ""  # "Figure 3"
+    number: str = ""  # "3", "2b"
+    caption: str = ""
+    caption_bbox: tuple[float, float, float, float] | None = None
+    inner_text: str = ""  # text objects inside a vector figure (axis labels, legend), native and exact
+    ocr_text: str = ""  # OCR of a raster figure
+    ocr_confidence: float | None = None  # 0-1
+    image_index: int | None = None  # index into PageContent.images for raster figures
+    alt_text: str = ""
+    figure_type: str = "unknown"  # chart | diagram | photo | screenshot | unknown (caption keywords only)
+    selection_score: float = 0.0
+    selection_reasons: list[str] = field(default_factory=list)
+    mentions: list[str] = field(default_factory=list)  # sentences elsewhere in the text that cite this figure
+    referenced_by: list[int] = field(default_factory=list)  # block orders of those sentences
+    description: str = ""  # generated summary (Phase 1); empty means none
+    description_status: str = "none"  # none | pending | done | failed | skipped
+    image_sha256: str = ""
+
+    @property
+    def has_text(self) -> bool:
+        return bool(self.caption or self.inner_text or self.ocr_text or self.alt_text)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "page_number": self.page_number,
+            "index": self.index,
+            "kind": self.kind,
+            "label": self.label,
+            "caption": self.caption,
+            "figure_type": self.figure_type,
+            "selection_score": self.selection_score,
+            "selection_reasons": list(self.selection_reasons),
+            "bbox": list(self.bbox) if self.bbox else None,
+            "referenced_by": list(self.referenced_by),
+            "description_status": self.description_status,
+        }
 
 
 @dataclass(slots=True)
@@ -206,6 +263,8 @@ class PageContent:
     ocr_text: str = ""
     tables: list[TableData] = field(default_factory=list)
     images: list[ImageData] = field(default_factory=list)
+    figures: list[FigureData] = field(default_factory=list)
+    size: tuple[float, float] | None = None  # (width, height) in points, when the format has pages
     page_type: PageType = PageType.TEXT_PAGE         #el default is text_page
     text_length: int = 0
     image_count: int = 0

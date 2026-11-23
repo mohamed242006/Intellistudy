@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from importlib import metadata as importlib_metadata
 from pathlib import Path
 
+from ai.ingestion.figures import link_mentions
 from ai.ingestion.models import (
     SCHEMA_VERSION,
     Block,
@@ -127,6 +128,8 @@ def render_block(block: Block) -> str:
     if block.type is BlockType.IMAGE_OCR:
         index = f" {block.ref_index + 1}" if block.ref_index is not None else ""
         return f"[Embedded Image{index} OCR]\n{block.text}"
+    if block.type is BlockType.FIGURE:
+        return f"[Figure]\n{block.text}"
     fixed_label = _LABELLED.get(block.type)
     if fixed_label:
         return f"{fixed_label}\n{block.text}"
@@ -195,6 +198,15 @@ def assign_heading_paths(blocks: Iterable[Block], *, carry_across_pages: bool = 
         block.heading_path = tuple(text for _, text in stack)
 
 
+_MAX_OUTLINE_TITLE = 200
+_SECTION_NUMBER = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?|[IVXLC]+\.|[A-Z]\.)\s+(?=\S)")
+
+
+def _title_key(text: str) -> str:
+    """Comparison key for bookmark titles: numbering ('1.', 'IV.', '2.3') is optional on either side."""
+    return _normalise_title(_SECTION_NUMBER.sub("", text, count=1))
+
+
 def _normalise_title(text: str) -> str:
     return re.sub(r"[\W_]+", " ", text.casefold()).strip()
 
@@ -213,7 +225,7 @@ def apply_outline_levels(document: Document, outline: list[tuple[int, str, int]]
         return 0
     by_page: dict[int, dict[str, int]] = {}
     for level, title, page in outline:
-        by_page.setdefault(page, {}).setdefault(_normalise_title(title), level)
+        by_page.setdefault(page, {}).setdefault(_title_key(title), level)
 
     changed = 0
     for doc_page in document.pages:
@@ -221,9 +233,16 @@ def apply_outline_levels(document: Document, outline: list[tuple[int, str, int]]
         if not titles:
             continue
         for block in doc_page.blocks:
-            if block.type is not BlockType.HEADING:
+            if block.type is BlockType.PARAGRAPH and len(block.text) <= _MAX_OUTLINE_TITLE:
+                # A section title typeset like body text (small caps, same size) is a paragraph
+                # to the font heuristics, but the bookmark names it: promote an exact match.
+                if _title_key(block.text) in titles:
+                    block.type = BlockType.HEADING
+                else:
+                    continue
+            elif block.type is not BlockType.HEADING:
                 continue
-            new_level = titles.get(_normalise_title(block.text))
+            new_level = titles.get(_title_key(block.text))
             if new_level is not None:
                 block.level = min(max(new_level, 1), MAX_HEADING_LEVEL)
                 changed += 1
@@ -326,6 +345,8 @@ def canonical_statistics(document: Document) -> dict[str, object]:
         "image_count": sum(len(page.images) for page in pages),
         "image_ocr_count": sum(len(page.images_with_text) for page in pages),
         "chart_count": count(BlockType.CHART),
+        "figure_count": count(BlockType.FIGURE),
+        "figure_candidates": sum(len(page.figures) for page in pages),
         "total_characters": sum(len(page.final_text) for page in pages),
         "average_confidence": (
             round(sum(confidences) / len(confidences), 3) if confidences else 0.0
@@ -350,6 +371,7 @@ def finalize_document(document: Document, *, carry_across_pages: bool = True) ->
             block.order = order
             order += 1
     assign_heading_paths(document.blocks, carry_across_pages=carry_across_pages)
+    link_mentions(document)
 
     merged = dict(document.statistics)
     merged.update(canonical_statistics(document))

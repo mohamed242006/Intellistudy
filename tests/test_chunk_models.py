@@ -49,7 +49,7 @@ class RequiredMetadataTests(unittest.TestCase):
         self.child = engine().run(self.doc, CTX).children[0]
 
     def test_identity_and_document_metadata(self) -> None:
-        self.assertRegex(self.child.chunk_id, r"^d0c0000000000001-\d{5}-[0-9a-f]{8}$")
+        self.assertRegex(self.child.chunk_id, r"^c-[0-9a-f]{12}$")
         self.assertEqual(self.child.doc_id, "d0c0000000000001")
         self.assertEqual(self.child.title, "OS Notes")
         self.assertEqual(self.child.author, "Dr. Ahmed")
