@@ -261,3 +261,60 @@ Scope: 111 cases (72 answerable, 37 refuse-expected), one retrieval cache (sha25
 4. **F-COV-3** (a04, x01) and the **x08** relevance-policy refusal: the only retrieval-stage losses.
 5. Governing thresholds (plan vs NFR-AIQ) still formally open; DeepSeek's false refusal (0.06) passes both.
 6. Run-to-run variation of a hosted model not measured; production model not chosen (DeepSeek is a stand-in; the planned OpenAI -> Gemma 3 27B path is untested).
+
+## 12. Post-evaluation fix: list-aware citation parsing (2026-11-23, branch `post-eval-quality`)
+
+**Defect.** `ai/answering/citations.parse` split replies at every newline and after every period, so (1) list items under an introduction cited once (`include [S5]:`) had no tag, (2) untagged `...:` introductions over cited items had no tag, (3) inline enumerations (`weaving: 1. A, 2. B`) were cut into fragments. Policy A removed them all as "no citation"; `render` then joined the survivors with spaces, flattening lists.
+
+**Fix.** Untagged list items take the tags of their own item, else of the enclosing item or the introduction; untagged introductions take their items' tags; inherited tags are marked (`Sentence.inherited`) and go through the **unchanged** grounding check against the named source (tested: an inherited item about something else is removed for low support). No split after inline enumerators or `e.g. / i.e. / vs. / cf. / Fig. / Eq. / No. / al.`; answers keep their lines and paragraphs. Tests: 9 new, 800 pass.
+
+**Measurement (*measured*, no API call).** Policy A/B1/C replayed with the fixed parser on the recorded DeepSeek replies; scored with the unchanged instruments. The replay harness was first shown to reproduce the live run exactly with the old parser (72 removals, 111/111 identical texts). Outputs: `evaluation/results/citefix_2026-11-23/` (with `SHA256SUMS.txt`). Qwen cannot be replayed (no raw replies).
+
+| DeepSeek | A before | A after | B1 before | B1 after | C before | C after |
+|---|---|---|---|---|---|---|
+| Sentences removed by grounding | 72 | **34** | 13 | 13 | 24 | 5 |
+| of which list items / ":" introductions | 17 / 16 | **1 / 4** | | 1 / 3 | | 0 / 0 |
+| Substantive sentences in final answers | 272 | 366 | 302 | 388 | 293 | 396 |
+| Correctness, all answerable | 68/72 | 68/72 | 68/72 | 68/72 | 68/72 | 68/72 |
+| Completeness, answered | 0.958 | 0.966 | 0.973 | 0.973 | 0.984 | 0.984 |
+| Gold source cited | 67/68 | **68/68** | 68/68 | 68/68 | 68/68 | 68/68 |
+| Citation precision | 0.935 | 0.938 | 0.931 | 0.931 | 0.938 | 0.938 |
+| Citation coverage (official instrument) | 0.923 | 0.872 | 0.930 | 0.876 | 0.867 | 0.821 |
+| Citation coverage (splitter aligned with parser) | 251/253 = 0.992 | 319/326 = 0.979 | 0.993 | 0.980 | 0.937 | 0.915 |
+| Cited sentences entailed by their sources (NLI) | 135/251 = 0.538 | **177/319 = 0.555** | 0.523 | 0.550 | 0.528 | 0.548 |
+| Substantive sentences attributed (NLI) | 135/272 = 0.496 | 177/366 = 0.484 | 0.487 | 0.482 | 0.457 | 0.449 |
+| Faithfulness, NLI sentence level | 0.647 | 0.656 | 0.639 | 0.657 | 0.611 | 0.639 |
+| Hallucination, sentence / answer level (NLI) | 0.353 / 0.603 | 0.344 / 0.632 | 0.361 / 0.662 | 0.343 / 0.662 | 0.389 / 0.691 | 0.361 / 0.721 |
+| Fabricated numbers | 0/68 | 0/68 | 0/68 | 0/68 | 0/68 | 0/68 |
+
+**Reading.** Removals under the shipped policy halve (72 -> 34); 94 more substantive sentences reach the reader, 42 more of them attributed by the judge (135 -> 177), with a slightly higher entailment rate among cited sentences. The **official coverage drop is an instrument artifact**: `answer_sentences` splits after every period, so list numbers ("1.") and abbreviation fragments ("e.g.") count as uncited claims; they used to be deleted together with their content, now the content is kept. With a splitter aligned to the parser, coverage stays at about 0.98. Answer-level hallucination rises only because answers are longer (the sentence-level rate falls). The remaining 34 removals: 28 no citation (12 are code lines of one answer, a11: fenced code is still parsed line by line), 4 low support, 2 unmatched quotations.
+
+**Effect on the policy decision.** With list-aware parsing, A removes 34 sentences against B1's 13 and C's 5; the gap that motivated B1 is now mostly code blocks and genuinely uncited prose.
+
+## 13. F-COV-3 investigation: why a04 and x01 never retrieve AOP1 p. 5 (2026-11-23)
+
+**Hypothesis tested.** F-COV-3 assumed that the flattened timeline graphic on AOP1 p. 5 hides the assessment facts. *Measured:* it does not. Ingestion keeps every fact ("Final Exam 40", "Lab Assignments 10", ...) in one intact 220-token chunk (`p. 5 > Assessment Criteria`); the timeline rows are noise at its top.
+
+**Chunk-level scores** (BGE-small vector / MiniLM rerank; the current values reproduce x18's cached scores exactly; a hit needs to be in the 20-candidate vector pool and beat the 6th rerank score):
+
+| Variant of the p. 5 chunk | a04 (6th rerank -3.30) | x01 (6th rerank -6.34) | x18 (6th rerank -11.19) |
+|---|---|---|---|
+| current | 0.642 / -9.52 | 0.618 / -6.82 | 0.686 / -5.11 |
+| timeline rows removed | 0.659 / -8.80 | 0.606 / -7.31 | 0.671 / -4.10 |
+| + document title prefix | 0.790 / **+3.20** | 0.720 / **+0.69** | 0.637 / -6.13 |
+| file-name prefix (timeline kept) | 0.793 / **+3.01** | 0.727 / **+2.06** | 0.641 / -5.31 |
+
+**Root cause.** The questions name the course ("the Aspect-Oriented course"); the chunk's only context is its heading. A document label is what the chunk lacks; the timeline is irrelevant.
+
+**Smallest change tried: label in the reranker passage only** (no re-embedding; full 30-file index rebuilt in this environment, all 111 queries; `evaluation/results/fcov3_2026-11-23/`). The rebuilt index is equivalent to the pinned cache (gold-in-top-6 and assessment level identical for all 111 cases; 14 near-tie order swaps), but not bit-identical, so the pinned cache stays the reference.
+
+| | pinned cache | rerank label = file name | rerank label = title, else file name |
+|---|---|---|---|
+| Gold source in top 6 (answerable) | 70/72 | 71/72 (+x01) | 71/72 (+x01) |
+| Answerable refused by the relevance policy | 1 (x08) | 1 (x18 newly; x08 unblocked) | 2 (x18, x11 newly; x08 unblocked) |
+| Not-answerable cases refused before the model | 35/39 | **32/39** (n09, n10, x15 now pass) | 32/39 |
+| a04 | gold not retrieved | still not retrieved (chunk outside the vector pool) | same |
+
+The reranker-only label is **not acceptable as is**: it trades x01/x08 for x18 (a case DeepSeek answers correctly today) and weakens the calibrated pre-model refusal, whose thresholds were fitted to unlabelled passages.
+
+**Expected gain of the full fix** (label in the embedded text and the reranker passage, re-embedded corpus, recalibrated relevance policy, new retrieval cache): at most **+2 answerable cases** (a04, x01), i.e. DeepSeek about 68/72 -> 70/72 (0.94 -> 0.97); x08 may also be unblocked by recalibration. This is within the benchmark's noise, and it ends the identical-retrieval comparison with the Qwen runs unless Qwen is re-run. Label quality is a real problem: of the 28 retrieved files, 4 are titled "PowerPoint Presentation", 7 have no title, AOP lecture 2 and Sections 02-03 carry copied titles, and several file names are meaningless (`hard_PDF_1`, `sample-long`). **Not implemented**; recorded as a decision (project_context section 8, item 15c).
