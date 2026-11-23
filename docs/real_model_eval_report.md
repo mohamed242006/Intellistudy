@@ -118,8 +118,8 @@ Nothing in this section involves a new model run: the same Qwen outputs (`evalua
 
 What changed and why: answerable 71 -> 72 and near-miss 11 -> 10 (a30); run A's only over-answer was a30, so over-answering becomes 0/37 and refusal recall 37/37; correctness moves by the a30 case (and, in run B, x09). Every NLI-based figure (faithfulness, hallucination, attribution) is computed on the same outputs with the same judge. **The verdict of section 2 does not change**: correctness and the NLI-based criteria still fail; the refusal criteria hold.
 
-## 9. Next run: prepared, not executed
-**Nothing below has been run; no OpenAI result exists.** Model choice and data sharing are open decisions.
+## 9. Next run: prepared 2026-11-15 (executed 2026-11-23 with DeepSeek instead of OpenAI, see section 10)
+**No OpenAI result exists.** The protocol below was executed unchanged on 2026-11-23 with `MODEL=deepseek-chat`, `--base-url https://api.deepseek.com` and `--api-key-env DEEPSEEK_API_KEY` (bash, Linux), writing to `runs_2026-11/` and passing `--out-dir "$RUNS"` to `score`; results in section 10. The text below is kept as written on 2026-11-15.
 
 Open decisions before running:
 1. **Data sharing.** The 30-file corpus (public sample files, arXiv papers, Slidesgo decks, the team's lecture PDFs and its own proposal) would be sent to the OpenAI API. The team must agree. No student data is involved.
@@ -157,3 +157,107 @@ python -m evaluation.root_cause --run "$RUNS/run_${MODEL}_A.jsonl" --ablation "$
 Remove-Item Env:OPENAI_API_KEY
 ```
 Compare with Qwen case by case (same 111 ids, same retrieval). The Qwen runs cannot be replayed under B1 (no raw replies were stored in 2026-10); their A and C numbers are the re-scored ones above. Repeating step 1 on a subset measures run-to-run variation (temperature 0 is not bit-deterministic on hosted APIs).
+
+## 10. DeepSeek run (2026-11-23)
+
+### 10.1 What was run (*measured*)
+- Protocol of section 9, unchanged code: `answer` (policy A, live), `replay` B1 and C on the same recorded replies (no API calls), `score` for each. Outputs in `evaluation/results/runs_2026-11/`: `smoke_deepseek-chat.jsonl` (3 cases), `run_deepseek-chat_{A,B1,C}.jsonl`, `metrics_/cases_/audit_sample_deepseek-chat_{A,B1,C}.json`, `root_cause_deepseek-chat.json` (A with C as the ablation) and `SHA256SUMS.txt` (14 artifacts, paths relative to the repository root; verify with `sha256sum -c evaluation/results/runs_2026-11/SHA256SUMS.txt` from the root).
+- Model: requested `deepseek-chat`; **every reply (75/75) reports `model: deepseek-flash`**. DeepSeek's changelog announced the discontinuation of the legacy name `deepseek-chat` for 2026-07-24; the API still accepted it and served `deepseek-flash`. Non-thinking mode is supported by the evidence: completion tokens per answer word median 1.44 (max 2.28), every `finish_reason` = `stop`, mean 1.8 s per call. Temperature 0, `max_tokens` 700, k = 6, prompt `answer-1`, up to 2 attempts (no repair attempt was needed).
+- Retrieval identity: every row carries cache sha256 `c003e59f...`, the same cache as both Qwen runs; same 111 case ids; 0 endpoint errors, no `.failure.json`.
+- Data sent to the provider: the prompt (question + retrieved passages) of the 75 model-called cases; 111,414 prompt tokens and 10,492 completion tokens in total (largest prompt 2,680 tokens).
+
+### 10.2 Results against the pre-registered criteria (95% Wilson CI in the metrics files)
+
+| Metric (criterion) | Qwen A (re-scored) | Qwen C (re-scored) | DeepSeek A | DeepSeek B1 (replay) | DeepSeek C (replay) |
+|---|---|---|---|---|---|
+| M1 correctness, all answerable (>= 0.70) | 40/72 = 0.56 | 51/72 = 0.71 | **68/72 = 0.94** (0.87-0.98) | 68/72 = 0.94 | 68/72 = 0.94 |
+| M1 correctness, answered (>= 0.80) | 40/60 = 0.67 | 51/61 = 0.84 | **68/68 = 1.00** | 68/68 = 1.00 | 68/68 = 1.00 |
+| M2 gold source cited (>= 0.85) | 57/60 = 0.95 | 58/61 = 0.95 | 67/68 = 0.99 | 68/68 = 1.00 | 68/68 = 1.00 |
+| M2 citation precision (>= 0.70) | 0.90 | 0.89 | 0.94 | 0.93 | 0.94 |
+| Citation coverage (no criterion) | 77/79 = 0.97 | 77/119 = 0.65 | 251/272 = 0.92 | 281/302 = 0.93 | 254/293 = 0.87 |
+| M3 faithfulness, NLI (>= 0.90) | 49/79 = 0.62 | 74/119 = 0.62 | 176/272 = 0.65 | 193/302 = 0.64 | 179/293 = 0.61 |
+| M4 hallucination, answer level (<= 0.10) | 23/60 = 0.38 | 26/61 = 0.43 | 41/68 = 0.60 | 45/68 = 0.66 | 47/68 = 0.69 |
+| Hallucination, sentence level pooled | 0.38 | 0.38 | 0.35 | 0.36 | 0.39 |
+| Fabricated numbers | 0/60 | 0/61 | 0/68 | 0/68 | 0/68 |
+| M4 over-answering (<= 0.05) | 0/37 | 0/37 | 0/37 | 0/37 | 0/37 |
+| M5 refusal recall (>= 0.95) | 37/37 | 37/37 | 37/37 = 1.00 | 37/37 | 37/37 |
+| M5 false refusal (<= 0.20; NFR-AIQ <= 0.10) | 12/72 = 0.17 | 11/72 = 0.15 | **4/72 = 0.06** | 4/72 | 4/72 |
+| M6 completeness, answered (>= 0.70) | 0.61 | 0.78 | 0.96 | 0.97 | 0.98 |
+| M7 cited sentences entailed by their sources (>= 0.85) | 40/77 = 0.52 | 40/77 = 0.52 | 135/251 = 0.54 | 147/281 = 0.52 | 134/254 = 0.53 |
+| M7 gold facts found in a cited source (>= 0.85) | 83/84 = 0.99 | 103/104 = 0.99 | 153/154 = 0.99 | 156/156 = 1.00 | 158/158 = 1.00 |
+| Sentences removed by grounding | 74 | 26 | 72 | 13 | 24 |
+| Mean seconds per model call | 112.7 | 238.9 | 1.8 | (replay) | (replay) |
+
+**Verdict under the plan's rule (section 4 of the plan):** every non-NLI criterion passes, including correctness (M1), citation (M2), over-answering and refusal (M4/M5) and completeness (M6). The three NLI-judged criteria (M3 faithfulness, M4 answer-level hallucination, M7 cited-sentence entailment) fail. M3 and M4 are *critical*, so formally the run is **not "acceptable in practice"**, but that verdict rests entirely on the NLI judge, which the evidence below shows to be unreliable. The final verdict waits for judge validation (hand labels).
+
+### 10.3 How far to trust the NLI numbers
+- `root_cause`'s judge check (the same instrument that gave 24 of 30 for Qwen): **74 of the 84 sentences the judge calls unsupported are judge disagreements** (>= 80% of their content words found in the sources), 10 possibly unsupported. An independent check over the context-level verdicts gives the same picture (88 of 96 share >= 80% of their content words with the context, 73 share all). Most "hallucinations" are paraphrases the 140-word-window judge does not accept.
+- Answer-level hallucination rises from 0.38 (Qwen) to 0.60 while the sentence-level rate is unchanged (0.38 -> 0.35): DeepSeek answers carry 4.0 substantive sentences per answer (272/68) against 1.3 for Qwen (79/60), so the same per-sentence false-positive rate compounds over more sentences. This is an artefact of the judge plus answer length, not evidence that DeepSeek invents more.
+- 0 fabricated numbers and 0 over-answers in 68 answers are judge-independent and hold.
+
+### 10.4 Failures and grounding behaviour
+- The 4 answerable failures are all refusals. `root_cause` triage: **retrieval 3** — a04 and x01 (the gold page AOP1 p. 5 never reached the model; the model then correctly declined, INSUFFICIENT_CONTEXT; likely root the flattened-timeline ingestion defect F-COV-3) and x08 (gold in context, but the relevance policy refused before the model: "databases" missing from the hits); **model reasoning 1** — a53 (dense-math arXiv question, gold in context, model declined). None is recoverable by switching grounding off. No answered case is wrong (68/68).
+- Policy A removed 72 sentences in 34 answerable cases (69 "no citation", 2 quotation not found, 1 low support). 17 of them start with a list marker and 16 are introductions ending in ":", which is the newline-splitting property of citation parsing (project_context section 7). **The grounding policy made no difference to correctness on this model** (A, B1 and C: 68/72 each); it changes only how much of each answer survives (coverage 0.92 / 0.93 / 0.87).
+
+### 10.5 Limits
+One run of one hosted model (temperature 0 is not bit-deterministic on hosted APIs; run-to-run variation not measured); the served model is `deepseek-flash`, whatever the requested name; same single-annotator lexical gold and unvalidated NLI judge as for Qwen; 111 cases (about +/-0.10 on proportions near 0.5, less near 0.95).
+
+### 10.6 What the data supports next (no change made)
+1. **Validate the judge** (hand labels, `evaluation/handlabel/`). It is now the only thing between this run and a verdict; the critical criteria cannot be decided without it.
+2. **Grounding policy:** with a model that cites reliably, A costs nothing in correctness but trims list items and introductions; B1 keeps the most cited content (13 removals). The decision needs the validated judge (does B1 keep unsupported sentences?) and should then fix the newline/list citation property regardless of policy.
+3. **Ingestion, not the model, is now the visible loss:** a04 and x01 (F-COV-3) fail because the gold page is never retrieved.
+4. ~~Write `runs_2026-11/SHA256SUMS.txt` and run `root_cause`~~ (done 2026-11-23, see section 11).
+
+## 11. Final evaluation summary (milestone closed 2026-11-23)
+
+Scope: 111 cases (72 answerable, 37 refuse-expected), one retrieval cache (sha256 `c003e59f...`) for every run, so retrieval, prompt (`answer-1`), k = 6, temperature 0 and `max_tokens` 700 are identical and only the model and the grounding policy vary. Qwen numbers are the 2026-11-15 re-scores; B1/C runs replay recorded replies offline. Artifacts verified by `SHA256SUMS.txt` in `runs_2026-10/` (3 files) and `runs_2026-11/` (14 files).
+
+### 11.1 Comparison
+
+| | Qwen A | Qwen C | DeepSeek A | DeepSeek B1 | DeepSeek C |
+|---|---|---|---|---|---|
+| **Correctness** all answerable | 40/72 = 0.56 | 51/72 = 0.71 | **68/72 = 0.94** | 68/72 = 0.94 | 68/72 = 0.94 |
+| Correctness of answered | 40/60 = 0.67 | 51/61 = 0.84 | 68/68 = 1.00 | 68/68 = 1.00 | 68/68 = 1.00 |
+| Completeness of answered | 0.61 | 0.78 | 0.96 | 0.97 | 0.98 |
+| **Refusal** recall (refuse-expected) | 37/37 | 37/37 | 37/37 | 37/37 | 37/37 |
+| Over-answering | 0/37 | 0/37 | 0/37 | 0/37 | 0/37 |
+| False refusal (answerable) | 12/72 = 0.17 | 11/72 = 0.15 | **4/72 = 0.06** | 4/72 | 4/72 |
+| Refused as uncited | 7 | 6 | **0** | 0 | 0 |
+| **Citation**: gold source cited | 57/60 = 0.95 | 58/61 = 0.95 | 67/68 = 0.99 | 68/68 = 1.00 | 68/68 = 1.00 |
+| Citation precision | 0.90 | 0.89 | 0.94 | 0.93 | 0.94 |
+| Citation coverage of sentences | 0.97 | 0.65 | 0.92 | 0.93 | 0.87 |
+| Fabricated numbers | 0/60 | 0/61 | 0/68 | 0/68 | 0/68 |
+| Sentences removed by grounding | 74 | 26 | 72 | 13 | 24 |
+| NLI faithfulness / answer-level hallucination (judge unvalidated) | 0.62 / 0.38 | 0.62 / 0.43 | 0.65 / 0.60 | 0.64 / 0.66 | 0.61 / 0.69 |
+
+### 11.2 Major failure categories (answerable cases)
+
+| Category | Qwen A (32 failures) | DeepSeek A (4 failures) |
+|---|---|---|
+| Wrong answer although the gold source was in context | 19 | 0 |
+| Refused because the model never cited (`uncited_answer`) | 7 | 0 |
+| Model declined (INSUFFICIENT_CONTEXT) with gold in context | 3 (a27, a46, a53) | 1 (a53) |
+| Gold source not retrieved (a04, x01; F-COV-3) | 2 | 2 |
+| Refused by the relevance policy (x08) | 1 | 1 |
+
+(Qwen per `metrics_qwen_rescored_20261115.json`: 19 wrong with gold in context, 1 wrong with gold not retrieved (a04), 7 uncited, 4 declined (incl. x01, gold not retrieved), 1 policy; regrouped here by stage.)
+
+### 11.3 Retrieval is not the bottleneck
+- The gold source was in the model's context for **70 of 72** answerable cases (0.97, CI 0.90-0.99); retrieval hit@5 on the labelled set is 0.96 with reranking (phase0_report).
+- Retrieval-stage failures are **3 cases** (a04, x01: gold page not retrieved; x08: relevance-policy refusal), **the same 3 for both models** because retrieval is identical. They cap correctness at 69/72 = 0.96; DeepSeek reaches 68/72.
+- The two missed retrievals trace to an ingestion defect (F-COV-3, flattened timeline on AOP1 p. 5), not to the embedding/ranking stage.
+
+### 11.4 Model capability was the bottleneck
+- On the **69 cases where retrieval delivered the gold source**, correctness is 40/69 (Qwen A), 51/69 (Qwen C) and **68/69** (DeepSeek A, B1 and C).
+- Paired by case (A vs A): both correct 40, **DeepSeek only 28, Qwen only 0**, neither 4; exact McNemar test p = 7.5e-9. Every case Qwen answers correctly, DeepSeek also does.
+- Qwen's losses are model behaviours that disappear with DeepSeek on the identical context: 19 wrong answers with the gold source in context, 7 answers refused for missing citations, placeholder answers ("a.c [1]", "This is stated in [1, 2, 3]").
+- The grounding policy is a secondary factor whose size depends on the model: switching it off recovered 11 Qwen cases (A 40 -> C 51) and **0 DeepSeek cases** (68 in A, B1 and C).
+- Caveats: one run per model; Qwen ran locally as a 4-bit 3B model, DeepSeek as a hosted model (`deepseek-flash`), so "model" includes size, quantisation and serving; lexical single-annotator gold.
+
+### 11.5 What remains open
+1. **NLI judge validation** (hand labels). It blocks the verdict on the critical criteria M3/M4: 74 of 84 DeepSeek sentences the judge rejects are judge disagreements.
+2. **Grounding-policy decision** (A / B1 / C) and `min_support` calibration, after 1. With DeepSeek the choice affects how much of an answer survives, not correctness.
+3. **Citation parsing splits at newlines**, removing list items and ":" introductions under policy A (33 of 72 DeepSeek removals). A stack fix independent of the policy decision.
+4. **F-COV-3** (a04, x01) and the **x08** relevance-policy refusal: the only retrieval-stage losses.
+5. Governing thresholds (plan vs NFR-AIQ) still formally open; DeepSeek's false refusal (0.06) passes both.
+6. Run-to-run variation of a hosted model not measured; production model not chosen (DeepSeek is a stand-in; the planned OpenAI -> Gemma 3 27B path is untested).

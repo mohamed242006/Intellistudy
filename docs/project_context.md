@@ -6,10 +6,11 @@ Graduation project, Computer Engineering, Ain Shams University, team of four.
 > **How to use this file.** It describes what exists in the repository today, why it was built that way,
 > how it was validated, and what is still open. Read sections 2-5 before touching `ai/`.
 > Assumed reader: an engineer or an AI assistant continuing the work with no other context.
-> Last updated: 2026-11-15 (consolidation pass, see 12). Commit state: commit `1660115` holds ingestion, chunking,
-> embedding, Chroma, the SQLite parent store and the base retrieval service; everything added since (answer layer,
-> retrieval add-ons `references/rerank/assessment/calibration`, figure modules, `evaluation/`, most of `docs/`) is
-> uncommitted as of this date (see 7 and 10).
+> Last updated: 2026-11-23 (DeepSeek evaluation, move to Linux, equation-extraction investigation, see 12). Commit state:
+> commit `1660115` holds ingestion, chunking, embedding, Chroma, the SQLite parent store and the base retrieval service;
+> commit `1a38fad` ("Answering+ eval pt1") holds everything added up to 2026-11-15 (answer layer, retrieval add-ons,
+> figure modules, `evaluation/`, `docs/`). Uncommitted as of 2026-11-23: `requirements.lock.txt` and the 2026-11-23 doc
+> edits. `evaluation/results/` is git-ignored and exists only locally (restored by hand after the machine move).
 >
 > **Labels used for status.** *Measured* = a number produced by a command on this repository (the date says when).
 > *Decision (open)* = a choice nobody has made yet. *Hypothesis* = an expectation not yet measured. *Superseded* =
@@ -50,7 +51,9 @@ Tesseract/pytesseract · Optional speech: Whisper · Deployment: Docker/Compose 
 
 ### LLM strategy
 Phase 1 OpenAI API; Phase 2 self-hosted Gemma 3 27B. The architecture stays model-agnostic (an adapter interface) so the swap is small.
-The only real model evaluated so far is Qwen2.5-3B through local Ollama (section 11), a floor for the stack, not the planned model.
+Two real models have been evaluated through the unchanged adapter (section 11): Qwen2.5-3B through local Ollama (2026-10, a floor
+for the stack) and DeepSeek `deepseek-chat`, served as `deepseek-flash` in non-thinking mode (2026-11-23, hosted API). Neither is the
+planned production model.
 
 ---
 
@@ -170,13 +173,14 @@ Plan and rationale: [`multimodal_ingestion_design.md`](multimodal_ingestion_desi
 ### 3.9 Evaluation harnesses (`evaluation/`)
 Not imported by product code. Retrieval: `retrieval_dataset.py` (87 labelled queries), `index_builder.py`, `retrieval_eval.py` (strategies, calibration, shipped-policy report). Answers: `answer_eval.py` (extractive baseline and quick runs), `answer_gold.py` (111 cases with gold facts and gold sources; post-evaluation corrections listed in its docstring), `answer_metrics.py` (correctness, citation hit/precision/coverage, NLI faithfulness and per-sentence attribution, hallucination, refusal metrics with Wilson intervals), `real_model_eval.py` (stages: `retrieve` (cache), `answer` (records raw replies; stops at the first `llm_unavailable` with the provider's error body, evaluation-only), `score`, `replay` (offline policy re-scoring), `label-template`), `policy_replay.py` (offline grounding policies A / B1 (experimental) / C), `root_cause.py` (failure triage), `handlabel/` (hand-label template of the 119 run-B sentences for judge validation, with instructions; **not labelled**). Raw outputs in `results/` (git-ignored; the Qwen runs and their retrieval cache are kept in `results/runs_2026-10/` with `SHA256SUMS.txt`). Figures: `figure_benchmark/` (hand labels for 236 real figure candidates, contact-sheet tools, synthetic corpus with exact ground truth, detection and retrieval runners).
 
-### 3.10 Answer Layer MVP (`ai/answering/`) - DONE; evaluated on one real model (Qwen2.5-3B); acceptance criteria not met (see 11)
+### 3.10 Answer Layer MVP (`ai/answering/`) - DONE; evaluated on two real models (Qwen2.5-3B: criteria not met; DeepSeek flash: all non-NLI criteria met, NLI-judged criteria fail on an unvalidated judge; see 11)
 Details, guarantees and results: [`answer_layer.md`](answer_layer.md) (MVP record) and section 11 (real-model evaluation).
 - `llm.py` LLM adapter (`LLMClient` protocol; `OpenAICompatibleClient` over stdlib HTTP for OpenAI / vLLM / Ollama / self-hosted Gemma or Qwen; `ExtractiveLLM` no-model baseline; `ScriptedLLM` for tests); `context.py` Context Builder (numbered sources S1..Sn, budget, de-duplication, wider-section context, generated/low-confidence flags); `prompt.py` Prompt Builder (versioned `answer-1`, fenced sources, neutralised tags); `citations.py` Citation Injection (validated `[S#]` -> reader-facing `[n]`); `grounding.py` Hallucination Prevention (per-sentence citation, word, number and quotation support; failing sentences removed); `refusal.py` Refusal Logic (pre-model and post-model, reasons `no_results`, `not_relevant`, `model_declined`, `uncited_answer`, `unsupported_claims`, `llm_unavailable`); `service.py` Answer Service.
 - Guarantees: retrieval scoped to one user and course; no uncited or ungrounded answer is returned; unrelated questions are refused before the model is called; a model outage is a refusal; source text cannot close its fence or impersonate a citation; answers resting on AI-generated figure text are flagged.
 - Production grounding policy: **A** (the shipped default above: uncited or unsupported sentences are removed). It stays the default until the stronger-model comparison is done (section 9). Alternative policies B1 and C exist only in the offline evaluation harness (3.9).
 - Measured with the extractive baseline on 87 labelled queries (2026-10-19): 24/24 unrelated refused before any model call; near-miss 9/10 refused; answerable 45/53 answered, 37/53 citing the expected source. This evaluates the machinery, not a language model's writing.
 - Measured with a real model (2026-10-25, Qwen2.5-3B, 111 cases): refusal and attribution hold; correctness fails its criterion. Summary in section 11.
+- Measured with a second real model (2026-11-23, DeepSeek flash, same 111 cases and identical retrieval): correctness 68/72 = 0.94, no wrong answer among 68 answered, refusal recall 37/37, false refusal 4/72. Summary in section 11.2.
 
 ### 3.11 FigureDescriber plug-in point (`ai/ingestion/figure_description.py`) - DONE (no vision model included)
 `FigureDescriber` / `FigureCropper` protocols, `PdfFigureCropper`, `enrich_figures` (never overwrites source text; rejects descriptions whose numbers are not in the author's text; caches by image hash + model + prompt version; one failing figure never stops the rest), `NullFigureDescriber`, `StubFigureDescriber`. The chunker renders a described figure with a labelled generated-description line, and because ids depend on text only, enrichment renames only the figure chunks. A real describer (Qwen2.5-VL or other) is adopted only if it clearly beats the Phase 0 baseline on the figure benchmark and on real figure-heavy documents. PPTX/DOCX croppers do not exist yet.
@@ -199,13 +203,14 @@ Intellistudy/
 │   ├── retrieval/     models, service (RetrievalService), references, rerank, assessment, calibration
 │   └── answering/     models, llm, context, prompt, citations, grounding, refusal, service (AnswerService)
 ├── backend/
-│   ├── app/           main.py (FastAPI skeleton, GET / only) + empty api/ core/ models/ services/ packages
+│   ├── app/           main.py only (FastAPI skeleton, GET / only)
 │   └── requirements.txt   fastapi, uvicorn, pymupdf, python-docx, python-pptx, pdfplumber, pillow, pytesseract, chromadb, sentence-transformers (unpinned)
-├── frontend/          empty
+├── (frontend/)        does not exist yet
 ├── evaluation/        retrieval_dataset, index_builder, retrieval_eval, answer_eval, answer_gold, answer_metrics,
 │                      real_model_eval, policy_replay, root_cause, handlabel/ (judge-validation template),
 │                      figure_benchmark/ (labels, synthetic corpus, evaluators),
-│                      results/ (git-ignored outputs; runs_2026-10/ = Qwen runs + retrieval cache)
+│                      results/ (git-ignored outputs; runs_2026-10/ = Qwen runs + retrieval cache + SHA256SUMS.txt;
+│                      runs_2026-11/ = DeepSeek smoke, A run, B1/C replays and their metrics/cases/audit files)
 ├── tests/             38 files: 33 test modules + 5 support files (chunk_fixtures, pdf_fixtures, pptx_fixtures,
 │                      random_docs, __init__)
 ├── data/uploads/      root: 2 Aspect-Oriented lecture PDFs, Intellistudy_final_proposal.pdf, Section 03 PPTX, test.pdf, test2.pdf;
@@ -214,13 +219,19 @@ Intellistudy/
 │                      validation_progress, e2e_validation_report, multimodal_ingestion_design, phase0_report, answer_layer (bannered),
 │                      real_model_eval_plan, real_model_eval_report, figma_ui_context, IntelliStudy_Architecture_Design_v1.1.docx
 ├── pyproject.toml     ruff / mypy / coverage configuration
+├── requirements.lock.txt  exact pins of the project .venv (121 packages, uv pip freeze, 2026-11-23)
 ├── docker-compose.yml EMPTY (no Dockerfile)
 ├── test_pptx_pipeline.py (10 routing tests), test_docs_pipeline.py, test_pipeline.py (manual dump scripts)
 └── .gitignore
 ```
 
-Environment: Windows 11, Python 3.12, PyMuPDF 1.28, python-pptx 1.0.2, python-docx 1.2, pdfplumber 0.11, Pillow 12,
-pytesseract + Tesseract 5.5, chromadb 1.5.9, sentence-transformers 6.0.0, ruff 0.17.1, mypy 2.4.0, coverage 7.16.2, vulture 2.16. pytest is not installed (tests use unittest).
+Environment (since 2026-11-23): Linux x86_64; project virtual environment `.venv` (git-ignored) with Python 3.12.16 (uv-managed;
+the system Python is 3.14 and is not used); CPU PyTorch 2.15.0 (deliberately CPU, so NLI scoring stays comparable with the CPU-measured
+Qwen numbers), transformers 5.24.0, sentence-transformers 6.0.0, chromadb 1.5.9, PyMuPDF 1.28.2, python-docx 1.2.0, python-pptx 1.0.2,
+pdfplumber 0.11.10, Pillow 12.3.0, pytesseract 0.3.13 + Tesseract (`/usr/bin/tesseract`), ruff 0.17.1, mypy 2.4.0, coverage 7.16.2,
+vulture 2.16; exact pins in `requirements.lock.txt` (recreate command in its header). pytest is not installed (tests use unittest).
+Hugging Face models (BGE-small, MiniLM reranker, NLI judge) download on first use. *Superseded:* Windows 11 + Python 3.12 in a
+OneDrive folder (until 2026-11-15).
 
 ---
 
@@ -239,7 +250,7 @@ pytesseract + Tesseract 5.5, chromadb 1.5.9, sentence-transformers 6.0.0, ruff 0
 | Hidden slides | Kept by ingestion, excluded by chunking | Consumers choose; students do not expect hidden content in answers. |
 | Citation strategy | `citation_label` on every chunk (`p. 14 > 8. Methodology`, `slide 7 > ...`, heading path for DOCX), computed from block page + heading path; prompts use `[S#]`, readers see `[n]` | Answers must point to a verifiable location. |
 | Re-ingestion | `embedding_hash` (vector reuse) + `record_hash` (metadata refresh) + stale deletion, tombstone 7 days | Cheap, idempotent updates; prevents dangling `parent_chunk_id` after edits. |
-| Grounding policy | **A** (remove uncited / unsupported sentences) until the stronger-model comparison | The safest option; its cost with a non-citing 3B model is measured (11); B1/C remain offline experiments. *Decision (open)*: final policy. |
+| Grounding policy | **A** (remove uncited / unsupported sentences) until the judge is validated | The safest option; its cost with a non-citing 3B model is measured (11). With DeepSeek (11.2) A, B1 and C give identical correctness (68/72) and differ only in how much of each answer survives (72 / 13 / 24 sentences removed). B1/C remain offline experiments. *Decision (open)*: final policy, after judge validation. |
 | Tests | unittest (not pytest) | pytest was not installed; suites also run under pytest. |
 | Normalisation | Selective NFKC | Plain NFKC corrupts `x^2`, `H2O`, fractions. |
 
@@ -278,7 +289,8 @@ Implementation status (as of 2026-10-18, unchanged on 2026-11-15): this is an ap
 | MyPy, `evaluation/` | `python -m mypy evaluation` | 17 errors in 5 older files (`figure_benchmark/synthetic.py`, `figure_benchmark/detection_eval.py`, `index_builder.py`, `retrieval_eval.py`, `answer_eval.py`); none in the files changed on 2026-11-15; pre-existing, not fixed (unrelated to this pass) |
 | Coverage | `python -m coverage run --branch -m unittest discover -s tests -t . && python -m coverage report` | **94%** combined (`coverage report` TOTAL); lines 5,326 / 5,616 = **94.8%**, branches 1,604 / 1,772 = **90.5%**; scope `ai/` as configured in `pyproject.toml` (`evaluation/` is not measured) |
 
-Baseline on the same day before any change: 764 tests, OK (skipped 6, expected failures 2). Expected failures: Arabic reversed order (PyMuPDF limitation) and open finding E2E-09. Skipped: opt-in real-model/tooling tests.
+Re-run 2026-11-23 on Linux (`.venv`, Python 3.12.16): `INTELLISTUDY_SKIP_SLOW=1 python -m unittest discover -s tests -t .` -> **791 tests, OK** (17 skipped, 1 expected failure, 35 s); the higher skip count comes from the slow-test switch (not broken down per test). Ruff, MyPy and coverage were not re-run on Linux.
+Baseline on 2026-11-15 before any change: 764 tests, OK (skipped 6, expected failures 2). Expected failures: Arabic reversed order (PyMuPDF limitation) and open finding E2E-09. Skipped: opt-in real-model/tooling tests.
 Slow tests: `INTELLISTUDY_SKIP_SLOW=1`; real-model tests: `INTELLISTUDY_MODEL_TESTS=1`. `ruff format` has not been applied.
 Performance (budgets asserted in the suite, *measured* 2026-11-15 baseline run): 3000 chunks indexed in 0.64 s (memory store) / 3.99 s (Chroma), 150-page PDF ingested in 2.2 s, 150-slide PPTX 1.2 s, 3000-paragraph DOCX 2.7 s, retrieval over 5000 vectors mean 45 ms / p95 51 ms.
 
@@ -310,8 +322,10 @@ The full dataset in `data/uploads/{docs,PDFs,pptx}` (10 DOCX, 10 PDF, 10 PPTX; 3
 ### Phase 0 pass (2026-10-19): E2E-07, E2E-10, figure infrastructure
 E2E-07 and E2E-10 are closed (E2E-10 with measured evidence and a calibrated, model-bound policy); Phase 0 figure infrastructure is built and benchmarked. Highlights (full tables and caveats in [`phase0_report.md`](phase0_report.md)): retrieval hit@5 0.925 -> 0.962 and MRR 0.884 -> 0.917 with demotion + reranking on 53 answerable queries; shipped policy refuses 24/24 unrelated queries and no answerable one (in-sample); figure selection on 236 hand-labelled real candidates reaches precision 0.76 / recall 0.83 in-sample (about 0.68 / 0.82 leave-one-file-out for uncaptioned pictures); synthetic corpus: 12/12 figures found with exact captions and linked citing sentences, hit@1 for figure questions 0.278 -> 0.639. The 30 real files still chunk with 0 validator problems.
 
-### Real-model evaluation (2026-10-25, re-scored 2026-11-15)
-See section 11.
+### Real-model evaluation (2026-10-25, re-scored 2026-11-15; DeepSeek 2026-11-23)
+See section 11. Benchmark corpus (verified 2026-11-23 from the retrieval cache): 30 files (15 PDF, 10 PPTX, 5 DOCX) selected from the
+36 in `data/uploads/` by `evaluation/index_builder.corpus_files` (5 excluded by name, 1 byte-identical duplicate of Section 03 dropped);
+the 666 cached hits come from 28 of them, each matching the current file by full sha256 (hard_PDF_6 and hard_PDF_8 are never retrieved).
 
 ### Corpus coverage assessment (2026-11-15)
 Full method, per-file verdicts and estimates: [`multimodal_ingestion_design.md`](multimodal_ingestion_design.md) section 14. Scope: the 30-file evaluation corpus.
@@ -343,26 +357,26 @@ Ingestion
 - Open evaluation findings: E2E-09 (coarse citation of merged DOCX chunks), E2E-11 (chunking time), E2E-12 (equation fragments).
 - Open findings of the 2026-11-15 coverage assessment (not fixed; detail in `multimodal_ingestion_design.md` 14.5):
   - **F-COV-1** DOCX/PPTX chunks are tagged `source_kind = "ocr_page"` whenever any image on the page/slide was OCR'd, even when OCR produced nothing (all 8,089 native tokens of `sample-long.docx` are tagged as OCR); misleads OCR notices and source-based statistics.
-  - **F-COV-2** Equation Editor (OLE `Equation.3`) objects are dropped: 104 in `SPE_l1.pptx` reach no block (only a WMF mild-skip warning). Largest category of content that does not reach the index.
+  - **F-COV-2** Equation Editor (OLE `Equation.3`) objects are dropped and reach no block (only a WMF mild-skip warning). Largest category of content that does not reach the index. *Correction 2026-11-23 (measured):* `SPE_l1.pptx` holds **52 unique equations** on 21 slides; "104" counted each one twice (same `p:oleObj` in `mc:Choice` and `mc:Fallback`). All 52 carry MTEF v3 data in an `Equation Native` stream and are decodable without vision (8, item 16).
   - **F-COV-3** AOP1 p. 5 (Assessment Criteria): a timeline graphic flattens into one run-on paragraph and the CSE 447 / CSE 434 weights interleave; likely root of answer failures a04, x01, x18.
   - **F-COV-4** Section 03's one hand-labelled keeper is not selected; 2 Statistical Methods figures are kept without any text and are not indexed.
 - Chroma on this machine: an index built by one process could not be re-opened by another (HNSW files missing) and cloud-sync folders lock segment files; the evaluation builds and queries in one process and indexes live outside the synced tree.
 
 Answer layer and its evaluation
-- **Answer quality with a real model** (*measured*, Qwen2.5-3B, 111 cases; section 11): refusal and attribution hold, correctness fails its criterion. The rule that removes uncited sentences removed 68 sentences in answerable cases, 39 of them entailed by the sources; 6 answerable cases were refused because the model never cited. *Decision (open)*: grounding policy (A keep / B1 repair-and-retag / C relax).
-- **The NLI judge is too strict** (`cross-encoder/nli-deberta-v3-small`, 140-word windows, p >= 0.5): 24 of the 30 sentences it called unsupported in the original run share >= 80% of their content words with the sources. Faithfulness and hallucination numbers are therefore pessimistic and not trustworthy in either direction until the judge is validated against hand labels (template ready, labels not done).
+- **Answer quality with a real model** (*measured*, section 11): with Qwen2.5-3B refusal and attribution hold but correctness fails (0.56); the rule that removes uncited sentences removed 68 sentences in answerable cases, 39 of them entailed by the sources, and 6 answerable cases were refused because the model never cited. With DeepSeek flash (2026-11-23) correctness is 0.94 and no answered case is wrong; policy A still removed 72 sentences (mostly uncited list items and ":" introductions) without changing any case's correctness. *Decision (open)*: grounding policy (A keep / B1 repair-and-retag / C relax), after judge validation.
+- **The NLI judge is too strict** (`cross-encoder/nli-deberta-v3-small`, 140-word windows, p >= 0.5): 24 of the 30 sentences it called unsupported in the Qwen run, and **74 of the 84 in the DeepSeek run** (`root_cause` judge check), share >= 80% of their content words with the sources. Faithfulness and hallucination numbers are pessimistic and not trustworthy in either direction until the judge is validated against hand labels (template ready, labels not done). This is now the blocker for a verdict on the critical criteria M3/M4.
 - **Gold-set limits**: lexical gold facts (recall only; extra content is not penalised); one annotator who also built the system; `a33` and `a50` have fact-design issues left open (section 11).
-- **Answer latency**: about 113 s per model-called case with Qwen2.5-3B on this CPU (239 s in the ablation run); the architecture target is a full answer p95 < 12 s. Says nothing about a hosted or GPU model.
+- **Answer latency**: about 113 s per model-called case with Qwen2.5-3B on the old Windows CPU (239 s in the ablation run); 1.8 s mean per model call with hosted DeepSeek flash (2026-11-23). The architecture target is a full answer p95 < 12 s; end-to-end latency including retrieval and reranking (about 2.5 s on CPU) has not been measured with a hosted model.
 - **Not built**: multi-turn history, streaming, HTTP endpoint, rate limits, cost accounting. Prompt injection is reduced (fencing, neutralised tags, citation validation), not eliminated; multilingual behaviour untested.
-- Citation parsing splits sentences at every newline, so list items under a cited introduction lose that citation and are removed by policy A (17 of the 68 removed sentences start with a list marker). This is a stack property, independent of the model.
+- Citation parsing splits sentences at every newline, so list items under a cited introduction lose that citation and are removed by policy A (17 of the 68 removed sentences start with a list marker with Qwen; 17 list items and 16 ":" introductions of the 72 removed with DeepSeek). The splitter also cuts inline numbered lists ("... approaches to aspect weaving: 1."). This is a stack property, independent of the model.
 
 Platform
 - **Storage quota and delete cascade not implemented**: the 1 GB per-user quota and cascading document deletion are policy only (see Storage and Retention Policy).
 - **Upload limits missing**: no file-size, page/slide-count, image-count, zip-bomb guard or Tesseract timeout.
 - **PostgreSQL persistence missing**: users, courses, documents and parent chunks live in SQLite/Chroma files only.
-- **CI/CD missing**: no GitHub Actions, no Dockerfile (docker-compose.yml is empty), requirements unpinned, Tesseract not in any image.
+- **CI/CD missing**: no GitHub Actions, no Dockerfile (docker-compose.yml is empty), Tesseract not in any image. `backend/requirements.txt` is unpinned; the working environment is pinned in `requirements.lock.txt` (2026-11-23, uncommitted).
 - Backend is a skeleton (`GET /` only): no upload API, auth or job queue. Chroma is single-process.
-- **Version control**: commit `1660115` holds the stack up to base retrieval; all later work is uncommitted. The repository sits in a OneDrive folder (one file was truncated during validation); Chroma indexes must live outside it. `evaluation/results/` is git-ignored, so evaluation outputs (including the Qwen runs and the retrieval cache) are local only. *Decision (open)*: whether to version them.
+- **Version control**: commits `1660115` and `1a38fad` hold the work up to 2026-11-15; `requirements.lock.txt` and the 2026-11-23 doc edits are uncommitted. `evaluation/results/` is git-ignored, so evaluation outputs (the Qwen runs, the retrieval cache, the DeepSeek runs) are local only; after the move to Linux they were missing until restored by hand from the old machine, which shows the risk. *Decision (open)*: whether to version them (or archive them elsewhere). *Superseded:* the OneDrive location of the Windows machine.
 
 ---
 
@@ -383,14 +397,18 @@ Platform
 12. FigureDescriber plug-in interface (no vision model)
 13. Real-model evaluation of the answer layer with Qwen2.5-3B (pre-registered plan, 111-case gold set, NLI-based metrics, partial grounding ablation, root-cause analysis) - 2026-10-25
 14. Evaluation hardening for the next model (2026-11-15): raw-reply logging, retrieval-cache pinning, citation coverage, per-sentence attribution, per-answer hallucination rate, removed-sentence counter fix, offline policy replay (A / B1 experimental / C), hand-label template, a30 and x09 gold corrections, Qwen runs re-scored
+15. Stronger-model run (2026-11-23): DeepSeek flash through the unchanged stack on the pinned retrieval cache, live policy A plus offline B1 / C replays, scored, root-caused and checksummed; evaluation milestone closed (section 11.2, `real_model_eval_report.md` section 11). Move to Linux with a pinned Python 3.12 environment the same day.
 
 ### In progress
-- Housekeeping: commit the work, keep this file current.
+- Housekeeping: commit the work (incl. `requirements.lock.txt` and the 2026-11-23 doc edits), keep this file current; archive `evaluation/results/` outside the machine (git-ignored, checksummed).
 - Table retrieval quality and table spacer columns (known issues).
 
 ### Planned (next first)
-15. **Stronger-model evaluation** (next): validate or replace the NLI judge with hand labels; decide the governing thresholds; run the current OpenAI small model through the unchanged stack on the pinned retrieval cache; replay policies A / B1 / C offline on its replies and compare case by case with Qwen; then decide the grounding policy and calibrate `min_support`. Needs the team's API/privacy decision (section 9).
-16. **Equation extraction without vision** (coverage assessment, F-COV-2 and E2E-12): read Equation Editor / OMML objects as text; merge fragmented PDF formula lines.
+15b. **Finish the stronger-model evaluation**: hand-label the judge-validation sheet (now the blocker for the M3/M4 verdict; consider adding DeepSeek sentences to it), decide the governing thresholds, then decide the grounding policy and calibrate `min_support`; fix the newline/list citation-parsing property whichever policy is chosen.
+16. **Equation extraction without vision** (next; investigation done 2026-11-23; F-COV-2 and E2E-12).
+    - *Measured:* `SPE_l1.pptx` holds 52 unique `Equation.3` objects on 21 slides (not 104); each is an OLE2 part with an `Equation Native` stream of MTEF v3 data (Equation Editor 3.0, Windows); no OMML (`m:oMath`) exists in the corpus. A throwaway decoder (not in the repository) parsed all 52 without error; characters, Greek letters, fractions, piles, sums and sub/superscripts are present in the data, but its template-selector table was guessed and must come from the official MTEF v3 specification (MathType SDK / Wiris "MTEF v.3 (Equation Editor 3.x)").
+    - *Plan (not started):* (1) `ai/ingestion/equations.py`: a bounds-checked MTEF v3 reader producing linear text (e.g. `ρ = λ / (c·μ)`) and, optionally, LaTeX; Symbol-font code mapping for Greek/operators; never executes or trusts object data (Equation Editor 3.0 was an exploited attack surface, CVE-2017-11882), size and recursion limits, any decode failure = existing mild-skip warning. (2) PPTX reader: read `Equation.3` graphic frames once (ignore the `mc:Fallback` duplicate) and emit a new block type or a paragraph block marked as equation, in reading order, with the slide's heading path; confidence 1.0 when decoded. Needs `olefile` (new dependency) or a minimal CFB reader. (3) Chunking: equation text joins the surrounding prose (not an isolated atom), so `L = λW` lands beside its explanation; a chunker version bump changes only the affected chunk ids. (4) Tests: fixtures built from the 52 real objects with hand-checked expected text; synthetic malformed streams. (5) Measurement: the 111-case benchmark has no equation question (the SPE_l1 cases a31-a35, x03, x14 ask about prose), so add about 10-15 equation questions on SPE_l1 (Little's law, utilisation, M/M/1 and M/M/c state probabilities, M/M/1/K) and score retrieval before/after; DOCX equations (OMML or OLE) and the PDF fragment merge (E2E-12) follow as separate steps.
+    - *Decisions (open):* text form (linear Unicode vs LaTeX vs both: embeddings read linear text better, LLMs read LaTeX well); whether to add `olefile`.
 17. **Figure-question benchmark** on the content that needs it (Section 02, the SPE_l1 chart, hard_PDF_1, a few AOP diagrams; about 30-40 questions), Phase 0 baseline scored first. Annotation can start in parallel with 15.
 18. **Vision bake-off** (decision on a Vision LLM for figures): only on the benchmark of 17, requiring a measurable gain over Phase 0 (see `phase0_report.md` section 5); needs the team's answers on GPU, privacy and budget (`multimodal_ingestion_design.md` sections 12 and 14).
 19. Gemma 3 27B on the same protocol as 15, if an OpenAI-compatible endpoint (hosted or GPU) is available; Gemma 3 4B is not planned (another CPU floor).
@@ -407,9 +425,9 @@ Platform
 
 ---
 
-## 9. Answer Layer: MVP built, evaluated once, next steps
+## 9. Answer Layer: MVP built, evaluated on two models, next steps
 
-Goal: turn `RetrievalResult` into grounded, cited, refusable answers, independent of the LLM vendor. **All components below exist** (section 3.10, `answer_layer.md`); the table keeps the original plan for reference. What remains: a real-model evaluation exists for Qwen2.5-3B only, and its criteria were not met (section 11). Next: a trustworthy faithfulness measurement, a stronger model, a grounding-policy decision, then an HTTP endpoint, multi-turn history, rate limits, cost accounting and ToC-chunk handling.
+Goal: turn `RetrievalResult` into grounded, cited, refusable answers, independent of the LLM vendor. **All components below exist** (section 3.10, `answer_layer.md`); the table keeps the original plan for reference. What remains: real-model evaluations exist for Qwen2.5-3B (criteria not met) and DeepSeek flash (all judge-independent criteria met; section 11). Next: a trustworthy faithfulness measurement (judge validation), a grounding-policy decision, then an HTTP endpoint, multi-turn history, rate limits, cost accounting and ToC-chunk handling.
 
 | Component | Responsibility |
 |---|---|
@@ -423,7 +441,7 @@ Goal: turn `RetrievalResult` into grounded, cited, refusable answers, independen
 
 Prerequisites met: calibrated relevance policy, reranker, labelled evaluation set (E2E-10), stable chunk ids (E2E-08), a hardened evaluation harness (2026-11-15). Still open: improved table retrieval; the grounding check has been run on one real (3B) model, where it removed correct content whenever the model left sentences untagged; its policy is undecided.
 
-**Next experiment (prepared, not run).** Exact commands: [`real_model_eval_report.md`](real_model_eval_report.md) section 9. *Decisions (open)* before running it: (1) the team agrees that the evaluation corpus (public sample files plus the team's own proposal and lecture PDFs) may be sent to the OpenAI API; (2) which OpenAI model: recommended first `gpt-4.1-mini` (runs through the unchanged adapter at temperature 0; reportedly leaves the API on 2027-01-14, so a diagnostic run); the successor gpt-6-luna reportedly rejects `max_tokens` and `temperature: 0`, which the adapter sends, so it needs an adapter change first; (3) which thresholds govern (eval plan vs architecture NFR-AIQ). *Hypothesis* (not a measurement): a model that reliably emits `[S#]` tags should lose far fewer answers to the citation rule than Qwen2.5-3B.
+**Stronger-model experiment: executed 2026-11-23 with DeepSeek** (protocol of [`real_model_eval_report.md`](real_model_eval_report.md) section 9, results in its section 10 and here in 11.2). The earlier *hypothesis* that a model which reliably emits `[S#]` tags loses far fewer answers to the citation rule is supported: 0 answers were refused as uncited (Qwen: 7). Still open: (1) judge validation; (2) which thresholds govern (eval plan vs architecture NFR-AIQ; false refusal 0.06 passes both); (3) the grounding-policy decision. No OpenAI or Gemini run exists (a Gemini AI Studio key created on 2026-11-23 returned 403 `PERMISSION_DENIED` / `API_KEY_INVALID` on `generateContent` at that time).
 
 ---
 
@@ -441,17 +459,19 @@ Prerequisites met: calibrated relevance policy, reranker, labelled evaluation se
 - **Observability**: logging exists in modules; no metrics or tracing.
 
 **Not ready**
-- **Real-LLM answer quality**: measured on Qwen2.5-3B only; pre-registered criteria not met (correctness below 0.70; faithfulness not measurable with the current judge); no stronger model tested. **Quizzes, adaptive learning** (not started).
+- **Real-LLM answer quality verdict**: with DeepSeek flash every judge-independent criterion passes (correctness 0.94, refusal recall 1.00, false refusal 0.06, 0 fabricated numbers, 0 over-answers), but the critical faithfulness/hallucination criteria can only be decided once the NLI judge is validated; one run of one hosted model, no production model chosen. **Quizzes, adaptive learning** (not started).
 - **Backend API, auth, multi-user data model, frontend** (skeleton or empty).
 - **Upload limits and abuse protection**, **Docker/deployment**, **CI/CD**, **dependency pinning**.
 - **Arabic / multilingual** content.
 - **Version control hygiene**: work after commit `1660115` is uncommitted.
 
-Verdict: the data, retrieval and answer-layer machinery (scoping, citations, refusal, grounding) are in place and tested. What is unproven is answer quality with a production-grade model: the only real model tested (3B) answers 56% (40/72, re-scored 2026-11-15) of answerable questions correctly under the shipped policy, and the faithfulness measurement is not yet trustworthy. The system as a whole is not production-ready.
+Verdict: the data, retrieval and answer-layer machinery (scoping, citations, refusal, grounding) are in place and tested. With a capable hosted model (DeepSeek flash, 2026-11-23) the unchanged stack answers 94% (68/72) of answerable questions correctly under the shipped policy, refuses every out-of-scope question and invents no numbers; with Qwen2.5-3B it was 56%. What is unproven is faithfulness, because the measurement (NLI judge) is not yet trustworthy. The remaining visible losses are ingestion defects (F-COV-3) and equations that never reach the index (F-COV-2). The system as a whole is not production-ready (no backend API, auth, frontend, deployment).
 
 ---
 
-## 11. Real-model evaluation of the Answer Layer (Qwen2.5-3B, 2026-10-25; re-scored 2026-11-15)
+## 11. Real-model evaluation of the Answer Layer
+
+### 11.1 Qwen2.5-3B (2026-10-25; re-scored 2026-11-15)
 
 Plan [`real_model_eval_plan.md`](real_model_eval_plan.md) (criteria fixed before any number; addendum §8 of 2026-11-15); results [`real_model_eval_report.md`](real_model_eval_report.md); code `evaluation/{answer_gold,answer_metrics,real_model_eval,policy_replay,root_cause}.py`; raw runs and the retrieval cache in `evaluation/results/runs_2026-10/` (sha256 in `SHA256SUMS.txt`; cache `c003e59f...`, verified identical to the retrieval both runs saw, 222/222 rows).
 
@@ -492,9 +512,32 @@ Plan [`real_model_eval_plan.md`](real_model_eval_plan.md) (criteria fixed before
 
 **Limits.** One model; one annotator; lexical gold (recall only); small single-corpus set (about +/-0.10 on proportions near 0.5; differences below about 0.15 are not meaningful between independent runs); NLI judge pessimistic by an unquantified amount; partial ablation; CPU latency (about 113 s per answer) says nothing about production speed; raw model replies were not stored in these runs, so they cannot be replayed under policy B1.
 
+### 11.2 DeepSeek (2026-11-23)
+
+Full record: [`real_model_eval_report.md`](real_model_eval_report.md) section 10. Outputs in `evaluation/results/runs_2026-11/`.
+
+**What was run (*measured*).** The section-9 protocol unchanged: requested model `deepseek-chat` at `https://api.deepseek.com`; every reply reports `deepseek-flash` (the legacy name was announced for discontinuation on 2026-07-24 and is still served); non-thinking (completion tokens per answer word median 1.44, all `finish_reason` = `stop`). Live run under policy A; policies B1 and C replayed offline on the same recorded replies. Same retrieval cache (`c003e59f...`) as both Qwen runs, same 111 ids, 0 endpoint errors, 75 model calls, 1.8 s mean per call, about 111k prompt + 10k completion tokens. `root_cause_deepseek-chat.json` (A vs C) and `runs_2026-11/SHA256SUMS.txt` (14 artifacts, verified) written 2026-11-23. **Evaluation milestone closed 2026-11-23**; final summary in `real_model_eval_report.md` section 11.
+
+**Headline (DeepSeek A vs Qwen A re-scored).** Correctness all answerable 68/72 = **0.94** (0.87-0.98) vs 0.56; of answered 68/68 vs 0.67; gold source cited 0.99 vs 0.95; citation precision 0.94 vs 0.90; refusal recall 37/37 both; false refusal **4/72 = 0.06** vs 0.17; over-answering 0/37 both; completeness (answered) 0.96 vs 0.61; fabricated numbers 0/68; gold facts in a cited source 153/154. NLI-judged: faithfulness 0.65 vs 0.62, answer-level hallucination 0.60 vs 0.38, sentence-level 0.35 vs 0.38, cited sentences entailed 0.54 vs 0.52. B1 and C replays: identical correctness (68/72), removals 13 (B1) and 24 (C) vs 72 (A).
+
+**Verdict under the plan's rule.** All non-NLI criteria pass; the three NLI-judged criteria fail, two of them critical (M3, M4), so the formal verdict is "not acceptable" **pending judge validation**: `root_cause`'s judge check finds 74 of the 84 sentences the judge rejects to be judge disagreements (Qwen: 24 of 30), and the higher answer-level rate follows from longer answers (4.0 substantive sentences per answer vs 1.3), not from a higher per-sentence rate (0.35 vs 0.38).
+
+**Failures (`root_cause`).** Retrieval 3: a04 and x01 (gold page AOP1 p. 5 never retrieved; the model then declined; likely root F-COV-3) and x08 (relevance policy refused with the gold in context). Model reasoning 1: a53 (dense-math question, declined with gold in context). None recoverable with grounding off. No answered case is wrong.
+
+**Conclusions (*measured*, identical retrieval for every run).**
+- *Retrieval is not the bottleneck:* the gold source reached the model in 70/72 answerable cases; retrieval-stage failures are the same 3 cases for both models and cap correctness at 69/72.
+- *Model capability was the bottleneck:* on the 69 cases where retrieval delivered the gold source, correctness is 40/69 (Qwen A), 51/69 (Qwen C), 68/69 (DeepSeek A, B1, C). Paired A vs A: DeepSeek alone correct on 28 cases, Qwen alone on 0 (exact McNemar p = 7.5e-9). Qwen's 19 wrong-with-gold-in-context answers and 7 uncited refusals do not occur with DeepSeek.
+- *Grounding policy is secondary and model-dependent:* switching it off recovered 11 Qwen cases and 0 DeepSeek cases.
+- Caveat: "model" includes size, 4-bit quantisation and local vs hosted serving; one run per model.
+
+**Limits.** One run of one hosted model (temperature 0 not bit-deterministic; variation not measured); same gold, judge and corpus limits as 11.1; the provider maps the model name to whatever it currently serves.
+
 ---
 
 ## 12. Changelog of this file
+
+- **2026-11-23 evaluation milestone closed**: `root_cause_deepseek-chat.json` and `runs_2026-11/SHA256SUMS.txt` produced; §11.2 failures re-stated from `root_cause`, judge check stated with the `root_cause` instrument (74/84), conclusions added (retrieval not the bottleneck, model capability was); §7 NLI bullet, §8 items 15 and housekeeping updated. `real_model_eval_report.md` section 11 (final summary) added.
+- **2026-11-23 DeepSeek evaluation, Linux environment, equation-extraction investigation** (no product code change): header commit state (`1a38fad`); §1 LLM strategy; §3.10 status and DeepSeek line; §4 folder tree (no `frontend/`, no empty backend packages, `runs_2026-11/`, `requirements.lock.txt`) and Linux / Python 3.12 `.venv` environment; §5 grounding-policy row; §6 Linux test re-run (791 OK) and verified benchmark corpus (30 files: 15 PDF, 10 PPTX, 5 DOCX); §7 answer-quality, NLI-judge, latency, citation-parsing, CI and version-control bullets, F-COV-2 corrected to 52 unique equations; §8 item 15 completed, 15b and item 16 (equation-extraction findings and plan) added; §9 experiment executed; §10 verdict; §11.2 DeepSeek results. `real_model_eval_report.md` section 10 added; F-COV-2 correction also in `multimodal_ingestion_design.md` 14.5.
 
 - **2026-11-15 corpus coverage assessment** (docs only, no code change): §6 new subsection with measured composition, reach by channel, Phase 0 per-file verdicts and labelled estimates; §3.8 real-corpus reach note; §7 open findings F-COV-1 to F-COV-4; §8 planned order changed to stronger-model evaluation -> equation extraction -> figure-question benchmark -> Vision bake-off (Gemma and later items renumbered 19-29). Full assessment in `multimodal_ingestion_design.md` section 14.
 - **2026-11-15 consolidation pass** (no behaviour change to the product): header date and accurate commit state; full related-documents list; schema references 2.0 -> 2.1 (§2, §3.1); §3 subsections reordered 3.1-3.11; §3.9/§4 evaluation harness and folder tree match the repository; §3.10 status records the Qwen2.5-3B evaluation and policy A as the production default; §5 chunk-ID decision updated to chunker 1.3.0 (`c-{hash12}` / `p-{hash12}`), grounding-policy row added; §6 quality gates re-run and recorded with commands; §7 answer-layer issues rewritten from real-model evidence (judge limits, latency, list-citation property, gold limits) and version-control bullet corrected; §8 Qwen evaluation and evaluation hardening completed, stronger-model experiment next; §9/§10 updated to the measured state; appended evaluation section integrated as §11 with re-scored numbers and the a30/x09 corrections; status labels (measured / decision / hypothesis / superseded) introduced. Four design documents received superseded-status banners; `figma_ui_context.md.md` renamed to `figma_ui_context.md`.
