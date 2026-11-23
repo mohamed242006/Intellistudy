@@ -95,6 +95,11 @@ class Citation:
 class Sentence:
     text: str
     tags: tuple[str, ...] = ()
+    # layout of the model's reply, so the answer keeps its lists and paragraphs (-1 = unknown: rendered inline)
+    line: int = -1
+    gap: bool = False  # a blank line precedes this sentence's line
+    indent: int = 0
+    inherited: bool = False  # tags taken from the list item / introduction it belongs to (still grounding-checked)
 
 
 @dataclass(frozen=True, slots=True)

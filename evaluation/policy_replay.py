@@ -25,6 +25,7 @@ Replay limits (recorded as warnings on each answer):
 
 from __future__ import annotations
 
+import dataclasses
 import time
 from collections.abc import Sequence
 from typing import Any
@@ -86,7 +87,7 @@ def retag_b1(
                 candidates.append(tags)
         for tags in candidates:
             if _passes(sentence.text, tags, bundle, policy):
-                out[i] = Sentence(sentence.text, tags)
+                out[i] = dataclasses.replace(sentence, tags=tags)  # keep the sentence's layout
                 retagged += 1
                 break
     return out, retagged

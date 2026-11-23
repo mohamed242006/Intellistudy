@@ -280,6 +280,58 @@ class CitationTests(unittest.TestCase):
     def test_reference_line(self) -> None:
         self.assertEqual(cit.reference_line(source()), "notes.pdf - p. 1 > Caching")
 
+    # --- list-aware parsing (evaluation 2026-11-23: list items and introductions were removed as uncited) -------
+    def test_list_items_inherit_the_tag_of_their_introduction(self) -> None:
+        reply = "Cache eviction works as follows [S1]:\n- Eviction removes the least recently used entry.\n- It happens when the cache is full."
+        parsed = cit.parse(reply, self.bundle)
+        self.assertEqual([s.tags for s in parsed.sentences], [("S1",), ("S1",), ("S1",)])
+        self.assertEqual([s.inherited for s in parsed.sentences], [False, True, True])
+        kept, report = check(parsed.sentences, self.bundle)
+        self.assertEqual(len(kept), 3)
+        self.assertEqual(report.removed, ())
+
+    def test_untagged_introduction_takes_the_tags_of_its_items(self) -> None:
+        reply = "These facts are covered:\n\n- Lru eviction removes the least recently used entry [S1].\n- Tcp handshake uses syn and ack [S2]."
+        parsed = cit.parse(reply, self.bundle)
+        self.assertEqual(parsed.sentences[0].tags, ("S1", "S2"))
+        self.assertTrue(parsed.sentences[0].inherited)
+        self.assertFalse(parsed.sentences[1].inherited)
+
+    def test_inherited_tags_are_still_grounding_checked(self) -> None:
+        reply = "Cache eviction works as follows [S1]:\n- Eviction removes the least recently used entry.\n- Students pay twenty five dollars monthly."
+        kept, report = check(cit.parse(reply, self.bundle).sentences, self.bundle)
+        self.assertEqual([s.text for s in kept][-1], "- Eviction removes the least recently used entry.")
+        self.assertEqual(len(report.removed), 1)
+        self.assertIn("low support", report.removed[0][1])
+
+    def test_items_under_an_untagged_introduction_stay_untagged(self) -> None:
+        parsed = cit.parse("Some points:\n- Eviction removes the least recently used entry.\n- Tcp uses syn packets.", self.bundle)
+        self.assertTrue(all(not s.tags for s in parsed.sentences))
+
+    def test_nested_items_inherit_from_the_enclosing_item(self) -> None:
+        reply = "- Cache eviction policies exist [S1].\n  - Lru removes the least recently used entry.\n- Tcp uses syn [S2]."
+        parsed = cit.parse(reply, self.bundle)
+        self.assertEqual([s.tags for s in parsed.sentences], [("S1",), ("S1",), ("S2",)])
+
+    def test_inline_enumeration_is_one_sentence(self) -> None:
+        parsed = cit.parse("There are three approaches: 1. Pre-processing, 2. Link-time weaving, 3. Dynamic weaving [S1].", self.bundle)
+        self.assertEqual(len(parsed.sentences), 1)
+        self.assertEqual(parsed.sentences[0].tags, ("S1",))
+        two = cit.parse("The value is 2. The next value is 3 [S3].", self.bundle)
+        self.assertEqual(len(two.sentences), 2)  # a number that ends a sentence still ends it
+
+    def test_tag_at_line_end_does_not_join_the_next_line(self) -> None:
+        parsed = cit.parse("- Lru evicts entries. [S1]\n- Tcp uses syn. [S2]", self.bundle)
+        self.assertEqual([(s.text, s.tags) for s in parsed.sentences], [("- Lru evicts entries.", ("S1",)), ("- Tcp uses syn.", ("S2",))])
+
+    def test_render_keeps_lists_and_paragraphs(self) -> None:
+        reply = "Intro sentence [S1].\n\nThe cache works as follows [S1]:\n- Eviction removes the oldest entry.\n  - When full."
+        text, _ = cit.render(cit.parse(reply, self.bundle).sentences, self.bundle)
+        self.assertEqual(
+            text,
+            "Intro sentence [1].\n\nThe cache works as follows [1]:\n- Eviction removes the oldest entry [1].\n  - When full [1].",
+        )
+
 
 class GroundingTests(unittest.TestCase):
     def setUp(self) -> None:

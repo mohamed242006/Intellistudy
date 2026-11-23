@@ -114,14 +114,25 @@ class ReplayEquivalenceTests(unittest.TestCase):
 
 
 class PolicyB1Tests(unittest.TestCase):
-    def test_list_items_inherit_the_tag_of_their_cited_introduction(self) -> None:
+    def test_list_items_under_a_cited_introduction_are_kept_by_every_policy(self) -> None:
+        # Since 2026-11-23 the citation parser itself gives list items the tag of their introduction (list-aware
+        # parsing), so policy A no longer drops them and B1 has nothing left to retag here.
         reply = ("The cache supports three eviction policies [S3]:\n"
                  "- least recently used removes the oldest entry\n"
                  "- first in first out removes entries in arrival order")
         a = replay_answer("q", result(), [{"text": reply}], "A")
         b1 = replay_answer("q", result(), [{"text": reply}], "B1")
-        self.assertNotIn("first in first out", a.text)  # policy A drops the untagged items
-        self.assertIn("first in first out removes entries in arrival order [1]", b1.text)
+        for answer in (a, b1):
+            self.assertIn("- first in first out removes entries in arrival order [1]", answer.text)
+        self.assertFalse(any("B1 (experimental)" in w for w in b1.warnings))
+
+    def test_b1_retags_an_untagged_prose_sentence_from_its_neighbour(self) -> None:
+        reply = ("The cache supports three eviction policies [S3]. "
+                 "First in first out removes entries in arrival order.")
+        a = replay_answer("q", result(), [{"text": reply}], "A")
+        b1 = replay_answer("q", result(), [{"text": reply}], "B1")
+        self.assertNotIn("arrival order", a.text)  # policy A drops the untagged sentence
+        self.assertIn("First in first out removes entries in arrival order [1].", b1.text)
         self.assertTrue(any("B1 (experimental)" in w for w in b1.warnings))
 
     def test_an_unsupported_untagged_sentence_is_not_laundered_into_a_citation(self) -> None:
