@@ -5,7 +5,9 @@ The model proposes questions as JSON; nothing it says is trusted. A question is 
 * structure (QAV-01): known type among the requested ones, exact field set, multiple choice with four distinct
   non-empty options and one in-range ``correct_index``, true/false with a real boolean;
 * evidence (QAV-02): cites a supplied source, and its evidence quote occurs in that source's text (whitespace and case
-  normalised);
+  normalised). PDF text keeps the printer's line-end word splits: a soft hyphen (U+00AD) plus a line break
+  ("adher\u00ad\nence") or a bare break between two letters ("TRIP\nOD"). A quote that rejoins such a word still
+  counts as copied (F-M4-06); it must remain one contiguous run of the source's own characters;
 * support (QAV-03): every content term and number of the correct option occurs in the evidence; a true/false statement
   shares at least half of its content terms with the evidence;
 * single answer (QAV-04): no distractor is fully covered by the evidence (it might also be correct);
@@ -48,6 +50,9 @@ _TF_KEYS = {"type", "stem", "answer", "rationale", "sources", "evidence", "topic
 _REQUIRED = {"type", "stem", "sources", "evidence", "topic", "difficulty", "cognitive_level"}
 _NUMBER = re.compile(r"(?<![A-Za-z])\d[\d,]*(?:\.\d+)?")
 _FENCED_JSON = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL)
+_SOFT_HYPHEN = re.compile(r"\u00ad\s*")  # an invisible hyphenation point, with the line break it marks
+_SPLIT_WORD = re.compile(r"(?<=[^\W\d_])[ \t]*\n[ \t]*(?=[^\W\d_])")  # line break between two letters
+_JOIN = "\x00"  # marks a line break that may be read as a space or as nothing
 
 SYSTEM_PROMPT = """You are IntelliStudy, writing practice questions from ONLY the numbered sources provided.
 
@@ -195,13 +200,35 @@ def parse_reply(text: str) -> list[Any] | None:
 
 # ---------------------------------------------------------------------------------------------- validation
 def _norm(text: str) -> str:
-    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", text)).strip().casefold()
+    return re.sub(r"\s+", " ", _SOFT_HYPHEN.sub("", unicodedata.normalize("NFKC", text))).strip().casefold()
+
+
+def _quoted(evidence: str, text: str) -> bool:
+    """``evidence`` is a contiguous run of ``text`` (F-M4-06). Soft-hyphen splits are removed on both sides; a bare
+    line break between two letters in ``text`` may be read as a space or as nothing. Nothing else is relaxed: every
+    character of the quote must still appear in order in the source, with no gap and no other substitution."""
+    quote = _norm(evidence)
+    if not quote:
+        return False
+    if quote in _norm(text):
+        return True
+    source = _SPLIT_WORD.sub(_JOIN, _SOFT_HYPHEN.sub("", unicodedata.normalize("NFKC", text)))
+    if _JOIN not in source:
+        return False
+    source = re.sub(r"\s+", " ", source).casefold()
+    parts: list[str] = []
+    for char, after in zip(quote, quote[1:] + " ", strict=True):
+        if char == " ":
+            parts.append(f"[ {_JOIN}]")
+        else:
+            parts.append(re.escape(char) + (f"{_JOIN}?" if char.isalpha() and after.isalpha() else ""))
+    return re.search("".join(parts), source) is not None
 
 
 def _clean(value: Any, low: int, high: int) -> str | None:
     if not isinstance(value, str):
         return None
-    text = re.sub(r"\s+", " ", sanitize_answer_text(value)).strip()
+    text = re.sub(r"\s+", " ", _SOFT_HYPHEN.sub("", sanitize_answer_text(value))).strip()  # rejoin split words
     return text if low <= len(text) <= high else None
 
 
@@ -238,7 +265,7 @@ def validate(item: Any, by_tag: dict[str, Section], types: Sequence[str]) -> tup
         return None, "evidence"
     sections = [c for c in cited if c is not None]
     evidence = _clean(item["evidence"], 10, 600)
-    if evidence is None or not any(_norm(evidence) in _norm(s.text) for s in sections):
+    if evidence is None or not any(_quoted(evidence, s.text) for s in sections):
         return None, "evidence"
     keys = list(dict.fromkeys(s.key for s in sections))
     documents = list(dict.fromkeys(s.document_id for s in sections))

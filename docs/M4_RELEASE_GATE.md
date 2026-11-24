@@ -1,8 +1,9 @@
 # M4 Release Gate: Summaries and Quiz Generation
 
 **Status:** release gate for backend milestone M4 (document summaries, multiple-choice and true/false quiz generation).
-**M4 cannot be approved, merged or released unless every item below passes.** Version 1.1, 2026-11-24 (v1.0 written
-before M4 implementation; v1.1: G4-PRV-04 wording for blank replies, which F-M3-04 already makes provider failures).
+**M4 cannot be approved, merged or released unless every item below passes.** Version 1.2, 2026-11-24 (v1.0 written
+before M4 implementation; v1.1: G4-PRV-04 wording for blank replies, which F-M3-04 already makes provider failures;
+v1.2: M4.1, G4-QAV-02 wording for line-end word splits (F-M4-06), manual DeepSeek run recorded in section 2.12).
 **Authority:** [`backend_security_contract.md`](backend_security_contract.md) v1.5 (rule ids such as `RET-09`), the
 requirements in `IntelliStudy_Architecture_Design_v1.1.docx` (FR-SUM, FR-QZ, NFR-AVL-03) and the team decisions in
 section 1.2. If this gate and the contract disagree, the contract wins and this file is corrected.
@@ -143,7 +144,7 @@ output, obedient injection replies) or the real provider over a mocked HTTP tran
 | ID | Test case | Expected result | Rules |
 |---|---|---|---|
 | G4-QAV-01 | Model questions with 3 or 5 options, duplicate options, empty options, zero or two correct answers, an out-of-range correct index, a non-boolean true/false answer | Each such question is dropped; only well-formed questions are stored | FR-QZ-02, FR-QZ-05 |
-| G4-QAV-02 | Questions whose source chunk id was not supplied, or whose evidence quote does not appear (after whitespace and case normalisation) in the cited chunk | Dropped | FR-QZ-05, UPL-14 |
+| G4-QAV-02 | Questions whose source chunk id was not supplied, or whose evidence quote does not appear (after whitespace and case normalisation; a word the PDF split at a line end, by a soft hyphen or a bare line break between two letters, may be quoted whole: F-M4-06) as one contiguous run of the cited chunk | Dropped | FR-QZ-05, UPL-14 |
 | G4-QAV-03 | Multiple choice: the correct option is not supported by the evidence; true/false: the statement is unrelated to the evidence | Dropped (the correct option's content terms must occur in the evidence quote; a true/false statement must share its content terms with the evidence) | FR-QZ-05 |
 | G4-QAV-04 | A distractor equal to the correct option after normalisation, or a distractor whose content terms all occur in the evidence quote | Dropped (a second correct answer cannot be ruled out) | FR-QZ-05 |
 | G4-QAV-05 | Near-duplicate questions within a quiz (token Jaccard of stems >= 0.8, or same evidence and same answer) | Only the first is kept | FR-QZ-05 |
@@ -227,6 +228,37 @@ output, obedient injection replies) or the real provider over a mocked HTTP tran
 - Background thread: with the runner thread started, a summary and a quiz reach `ready` without test-driven polling.
 - Providers: scripted models or the real `DeepSeekProvider` over a mocked transport; no network call in any test.
 - Findings F-M4-01..04 in the contract's Appendix D.
+
+### 2.12 M4.1 patch and manual DeepSeek run (2026-11-24)
+
+Manual run on one real PDF (an 11-page open-access journal article, 9 sections, provider DeepSeek). Recorded without
+document content.
+
+| Measure | Summary | Quiz (10 requested, `mcq` + `true_false`) |
+|---|---|---|
+| Server-side generation time (NFR-PER-05: quiz under 45 s) | 11.6 s | 18.5 s |
+| Provider calls / tokens | 8 / 15,807 | 3 / 19,808 |
+| Grounding removals | 4 of 37 sentences | - |
+| Result before M4.1 | `ready` | `ready`, 5 of 10 questions with the shortage notice; answer keys checked by hand: 5 of 5 correct; no key field in any response |
+
+The quiz shortfall was traced with an instrumented run of the same generator, validator and document (real provider,
+usage recorded in the ledger). The run's PDF maps its hyphenation glyph to U+00AD, so the extracted text keeps
+"adher\u00ad\nence"; quotes of the printed word failed G4-QAV-02 (F-M4-06). Summary fragments such as "(26.8%) the most
+common sources" came from the sentence splitter ending a sentence at "U.S." (F-M4-05).
+
+| Instrumented run | Generated | Passed validation | Dropped by reason | Final | Yield (final / requested) |
+|---|---|---|---|---|---|
+| before M4.1 | 22 | 6 | evidence 10, second_correct_option 5, unsupported_answer 1 | 6 | 60% |
+| after M4.1, run 1 | 20 | 9 | second_correct_option 10, unsupported_answer 1, near_duplicate 1 (after validation) | 8 | 80% |
+| after M4.1, run 2 | 19 | 10 | second_correct_option 8, evidence 1 | 10 | 100% |
+
+- All 10 evidence drops before the patch were line-end splits; after it, one remains (the model printed the soft
+  hyphen as "-": "TRI-POD"), and none of the 8 inspected `second_correct_option` drops was a faulty question: the
+  evidence sentence names the distractor as a contrast ("58.5% ... statistical and 41.5% ... machine learning"). QAV-04
+  is kept as designed (it is a gate control); a prompt change asking for distractors that the evidence does not name is
+  the non-weakening way to raise the yield (F-M4-02, updated).
+- Regression tests: `backend/tests/test_m41_regressions.py` (15 tests, verbatim extractions from the run's PDF); each
+  test group fails when its fix is reverted. Backend 340 tests OK; `ai/` 800 tests OK; ruff and mypy clean.
 
 ---
 

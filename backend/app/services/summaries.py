@@ -38,6 +38,8 @@ Rules:
 _HEADER = re.compile(r"^\s{0,3}#{1,6}\s*\[?\s*(S\d+)\s*\]?[^\n]*$", re.MULTILINE)
 _INVALID_TAG_WARNING = "model cited sources that were not provided"
 _BULLET = re.compile(r"^\s*(?:[-*\u2022+\u2013]|\d{1,3}[.)])\s+")
+_WORD = re.compile(r"[^\W\d_]{2,}")  # a word of at least two letters
+MIN_SENTENCE_WORDS = 3
 
 
 class GenerationFailed(Exception):
@@ -117,6 +119,8 @@ def summarize(sections: list[Section], llm: Any, *, batch_tokens: int, max_token
                 text = _BULLET.sub("", sanitize_answer_text(sentence.text)).strip()
                 if not sentence.tags or not re.search(r"\w", text):
                     continue  # framing text without a citation is not part of a summary
+                if len(_WORD.findall(text)) < MIN_SENTENCE_WORDS:
+                    continue  # an orphaned fragment such as "2021;10(1):89)" is not a sentence (F-M4-05)
                 keys = [s.chunk_id for s in (bundle.by_tag(t) for t in sentence.tags) if s is not None]
                 sentences.append((text, keys))
             if not sentences:

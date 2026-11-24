@@ -27,7 +27,13 @@ _TAG_AFTER_STOP = re.compile(r"([.!?])\s*((?:\[\s*S\d+(?:\s*[,;]\s*S\d+)*\s*\][ 
 _SPLIT = re.compile(r"(?<=[.!?])\s+(?=[\"'(\[A-Z0-9؀-ۿ])")
 _LIST_ITEM = re.compile(r"^(?:[-*•+–]|\d{1,3}[.)]|[a-zA-Z][.)]|\(\w{1,3}\))\s+")
 _ENUMERATOR_END = re.compile(r"(?:^|[:;,(])\s*\d{1,2}\.$")  # "...weaving: 1." / ", 2." - an inline list continues
-_ABBREVIATION_END = re.compile(r"\b(?:e\.g|i\.e|vs|cf|Fig|Eq|No|al)\.$")
+# A piece ending in an abbreviation continues: initialisms ("U.S.", "e.g.", "a.m."), titles ("Dr.", "Prof."), reference
+# and citation words ("Rev.", "Vol.", "pp."), "etc." (F-M4-05: "the U.S. (26.8%)" was split into two sentences, and
+# grounding then kept the orphaned second half).
+_ABBREVIATION_END = re.compile(
+    r"(?:\b(?:[A-Za-z]\.){2,}"
+    r"|\b(?:e\.g|i\.e|vs|cf|Fig|Figs|Eq|Eqs|No|Nos|al|etc|approx|Dr|Drs|Prof|Mr|Mrs|Ms|St|Jr|Sr|Rev|Vol|Vols|pp|p"
+    r"|Ch|Sec|Ref|Refs|Tab|Ed|Eds|Inc|Ltd|Co|Corp|Dept|Univ|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.)$")
 
 
 @dataclass(frozen=True, slots=True)

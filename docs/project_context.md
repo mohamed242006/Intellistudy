@@ -234,15 +234,20 @@ Gate: [`M3_RELEASE_GATE.md`](M3_RELEASE_GATE.md), 52 items passing in CI (run #5
 
 
 ### 3.16 Backend summaries and quizzes, M4 (`backend/`) - DONE locally 2026-11-24 (CI on push pending)
-Gate: [`M4_RELEASE_GATE.md`](M4_RELEASE_GATE.md) v1.1, 67 items passing locally, evidence in its section 2.11; findings
-F-M4-01..04 in [`backend_security_contract.md`](backend_security_contract.md) Appendix D (contract v1.7). Decisions D-1..D-5
+Gate: [`M4_RELEASE_GATE.md`](M4_RELEASE_GATE.md) v1.2, 67 items passing locally, evidence in its sections 2.11-2.12; findings
+F-M4-01..07 in [`backend_security_contract.md`](backend_security_contract.md) Appendix D (contract v1.8). Decisions D-1..D-5
 approved without changes.
 - Endpoints: `GET/POST /api/v1/documents/{id}/summary` (`{regenerate?}`; 200 stored, 202 queued), `POST/GET /api/v1/courses/{id}/quizzes` (`{document_ids?, question_count 5-30, question_types mcq|true_false, title?}`), `GET/DELETE /api/v1/quizzes/{id}`, `POST /api/v1/quizzes/{id}/regenerate`. Migration `0006_summaries_quizzes` (`summaries`, `quizzes`, `quiz_sources`, `quiz_questions`, `quiz_answer_keys`, `generation_jobs`).
 - Generation runs on its own background thread (`GenerationRunner`; ingestion keeps its runner). Sources are read only through the scoped loader (`services/sources.py`: owned ready row -> parent keys -> `get_many(keys, user_id, course_id)`, tripwire on every parent). Every model call goes through the usage ledger with a budget check before each call; results are stored in one transaction only after the sources are re-read and still `ready`.
 - Summaries (`services/summaries.py`): one structured summary per document; map batches cover every section exactly once (ordered merge, no gaps); tags parsed and grounding-checked as in chat; images stripped; headings from the document's structure; page/slide ranges from citations. Stored and served until an explicit regeneration, which replaces it atomically (a failed one keeps the old).
 - Quizzes (`services/quizgen.py`): JSON output parsed strictly; deterministic validation (structure, evidence quoted from a supplied source, correct option covered by the evidence, no second covered option, tags from enums, near-duplicates removed); server-side balanced option shuffle; answer keys in their own table, never serialised (no API module imports it). Shortage: `ready` with at least 5 and a notice, else `failed` / `insufficient_material`.
 - Deletion (`services/lifecycle.py`, called from the document purge): summaries deleted (T-1); quizzes with only that source deleted (T-2); multi-source quizzes `invalid` / `source_deleted` with questions and keys removed until regenerated (T-3). The token ledger is never touched.
-- Tests: 67 M4 gate tests (`backend/tests/test_g4_*.py`) plus traceability; 325 backend tests in total. Not yet done: the manual DeepSeek quality run (gate section 3).
+- Tests: 67 M4 gate tests (`backend/tests/test_g4_*.py`) plus traceability; 325 backend tests in total.
+- **M4.1 patch (2026-11-24)**, after the manual DeepSeek run on a real journal PDF (gate v1.2, section 2.12; contract v1.8):
+  quiz evidence may quote a word the PDF split at a line end (F-M4-06: soft hyphens; it had dropped 10 of 22 questions,
+  5 of 10 delivered); the sentence splitter no longer ends sentences at "U.S.", "Rev.", "Dr.", "Prof.", "etc." and
+  summaries drop citation-number fragments (F-M4-05). Instrumented yield: 60% before, 80% and 100% after. Open:
+  F-M4-07 (soft hyphens at ingestion split terms for grounding and retrieval). 15 regression tests; 340 backend tests.
 ---
 
 ## 4. Current Folder Structure
@@ -678,6 +683,7 @@ Detail: section 6 (corpus composition and coverage assessment), section 7 (table
 
 ## 13. Changelog of this file
 
+- **2026-11-24 M4.1 patch**: F-M4-05 (sentence splitter abbreviations, summary fragments) and F-M4-06 (quiz evidence across line-end word splits) fixed; F-M4-07 recorded; manual DeepSeek run recorded in M4 gate v1.2 section 2.12; contract v1.8; §3.16 bullet.
 - **2026-11-24 M4 implemented**: new §3.16 (summaries, quizzes, generation runner, deletion rules; 67 gate tests passing locally; findings F-M4-01..04); §8 milestone line; contract v1.7; M4 gate v1.1 (PRV-04 wording) with evidence section 2.11.
 - **2026-11-24 F-M3-05 fixed** (before M4, team decision): usage ledger `llm_usage` is the single source of truth for the daily token budget; §3.15 note; contract v1.6.
 - **2026-11-24 M4 release gate**: `docs/M4_RELEASE_GATE.md` (67 items in 10 areas: summary and quiz isolation, shared token budget, provider failures, summary citation validation, quiz answer validation, no answer-key leakage, deletion and invalidation, summary storage, injection and scope); contract v1.5 (ISO-03, ISO-04, UPL-16; finding F-M3-05: deleting a conversation refunds the M3 token budget); §8 milestone line.
