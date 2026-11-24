@@ -128,6 +128,11 @@ class Settings(BaseSettings):
     llm_daily_token_budget: int = Field(default=200_000, gt=0)  # per user per UTC day (UPL-16, OWASP LLM10)
     chat_retrieval_k: int = Field(default=6, ge=1, le=20)
     chat_max_tokens: int = Field(default=700, ge=50, le=4000)
+    summary_batch_tokens: int = Field(default=2500, ge=200, le=20_000)  # source tokens per map call (FR-SUM-05)
+    summary_max_tokens: int = Field(default=900, ge=100, le=4000)  # output cap per map call
+    quiz_batch_questions: int = Field(default=10, ge=1, le=30)
+    quiz_context_tokens: int = Field(default=5000, ge=500, le=30_000)  # source tokens per quiz call
+    quiz_max_tokens: int = Field(default=3500, ge=200, le=8000)
     deepseek_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
 

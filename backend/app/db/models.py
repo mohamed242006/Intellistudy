@@ -21,12 +21,20 @@ __all__ = [
     "Course",
     "Document",
     "DocumentStatus",
+    "GenerationJob",
+    "GenerationKind",
     "JobStatus",
     "LlmUsage",
     "Message",
     "ProcessingJob",
+    "Quiz",
+    "QuizAnswerKey",
+    "QuizQuestion",
+    "QuizSource",
+    "QuizStatus",
     "RefreshToken",
     "Role",
+    "Summary",
     "UsageFeature",
     "User",
 ]
@@ -212,3 +220,122 @@ class LlmUsage(UUIDPrimaryKey, Base):
     prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+# --------------------------------------------------------------------------------------------- M4: generation
+class GenerationKind(StrEnum):
+    SUMMARY = "summary"
+    QUIZ = "quiz"
+
+
+class GenerationJob(UUIDPrimaryKey, Timestamps, Base):
+    """Background summary / quiz generation (M4 gate D-2). Carries ids only; the runner re-loads everything with its
+    owner. A summary job belongs to its document, a quiz job to its quiz: deleting either deletes the job (T-1..T-3)."""
+
+    __tablename__ = "generation_jobs"
+    __table_args__ = (Index("ix_generation_jobs_status", "status"), Index("ix_generation_jobs_owner_id", "owner_id"))
+
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    course_id: Mapped[str] = mapped_column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    document_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("documents.id", ondelete="CASCADE"),
+                                                    nullable=True)
+    quiz_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default=JobStatus.QUEUED.value)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class Summary(UUIDPrimaryKey, Timestamps, Base):
+    """The stored summary of one document (T-4, D-1). Exists only once a generation succeeded; replaced atomically
+    by a successful regeneration (G4-CAC-03); deleted with its document (T-1)."""
+
+    __tablename__ = "summaries"
+    __table_args__ = (Index("ix_summaries_owner_id", "owner_id"),)
+
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    course_id: Mapped[str] = mapped_column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    document_id: Mapped[str] = mapped_column(String(36), ForeignKey("documents.id", ondelete="CASCADE"),
+                                             nullable=False, unique=True)
+    sections: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
+    citations: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
+    warnings: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    grounding: Mapped[dict[str, int]] = mapped_column(JSON, nullable=False)
+    chunk_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class QuizStatus(StrEnum):
+    GENERATING = "generating"
+    READY = "ready"
+    FAILED = "failed"
+    INVALID = "invalid"
+
+
+class Quiz(UUIDPrimaryKey, Timestamps, Base):
+    __tablename__ = "quizzes"
+    __table_args__ = (Index("ix_quizzes_owner_id", "owner_id"), Index("ix_quizzes_course_id", "course_id"))
+
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    course_id: Mapped[str] = mapped_column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default=QuizStatus.GENERATING.value)
+    invalid_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    notice: Mapped[str | None] = mapped_column(Text, nullable=True)
+    requested_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    question_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    question_types: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    generated_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class QuizSource(UUIDPrimaryKey, Base):
+    """A source document of a quiz. ``document_id`` is deliberately not a foreign key: deleting the document runs the
+    T-2 / T-3 rules (delete or invalidate the quiz) instead of a silent cascade."""
+
+    __tablename__ = "quiz_sources"
+    __table_args__ = (Index("ix_quiz_sources_quiz_id", "quiz_id"), Index("ix_quiz_sources_document_id", "document_id"))
+
+    quiz_id: Mapped[str] = mapped_column(String(36), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    document_id: Mapped[str] = mapped_column(String(36), nullable=False)
+
+
+class QuizQuestion(UUIDPrimaryKey, Base):
+    """The public part of a question. The answer lives only in :class:`QuizAnswerKey` (contract ISO-04)."""
+
+    __tablename__ = "quiz_questions"
+    __table_args__ = (Index("ix_quiz_questions_quiz_id", "quiz_id"),)
+
+    quiz_id: Mapped[str] = mapped_column(String(36), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    type: Mapped[str] = mapped_column(String(16), nullable=False)
+    stem: Mapped[str] = mapped_column(Text, nullable=False)
+    options: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    topic: Mapped[str] = mapped_column(String(80), nullable=False)
+    difficulty: Mapped[str] = mapped_column(String(8), nullable=False)
+    cognitive_level: Mapped[str] = mapped_column(String(16), nullable=False)
+
+
+class QuizAnswerKey(UUIDPrimaryKey, Base):
+    """Correct answer, rationales, evidence and sources of one question. Never serialised by the API in M4 (ISO-04);
+    M5 grading reads it."""
+
+    __tablename__ = "quiz_answer_keys"
+    __table_args__ = (Index("ix_quiz_answer_keys_quiz_id", "quiz_id"),)
+
+    question_id: Mapped[str] = mapped_column(String(36), ForeignKey("quiz_questions.id", ondelete="CASCADE"),
+                                             nullable=False, unique=True)
+    quiz_id: Mapped[str] = mapped_column(String(36), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    correct_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    correct_bool: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    rationales: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    evidence: Mapped[str] = mapped_column(Text, nullable=False)
+    source_chunk_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    source_document_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)

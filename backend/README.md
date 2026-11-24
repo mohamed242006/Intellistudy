@@ -12,7 +12,7 @@ RET-06, ...) are cited in code and tests.
 | M1 | Identity, courses, ownership: register/login/refresh/logout/logout-all/me/change-password, Argon2id, HS256 access tokens, rotating refresh tokens with reuse detection, lockout, rate limits, course CRUD through `get_owned`; release gate `docs/SECURITY_MERGE_GATE.md` (79 items, all passing) | done (CI green) |
 | M2 | Documents and processing: streaming upload, file validation, ZIP-bomb and encryption checks, ownership-safe storage, sandboxed parser process, job runner; gate M2 section (39 items) | done (CI green) |
 | M3 | Grounded chat: conversations, messages, READY-only scoped retrieval, citation validation, answer sanitising, chat states, provider failure handling, token budget; release gate `docs/M3_RELEASE_GATE.md` (52 items, all passing; F-M2-10 closed) | done (CI green) |
-| M4 | Summaries + quiz generation; release gate `docs/M4_RELEASE_GATE.md` (67 items) | next (gate written, not implemented) |
+| M4 | Summaries + quiz generation: stored per-document summaries (map batches, grounded citations), multiple-choice and true/false quizzes with deterministic validation, separate answer keys, background generation, deletion rules; release gate `docs/M4_RELEASE_GATE.md` (67 items, all passing locally) | done (CI on push) |
 | M5 | Quiz taking, end-to-end demo, security verification | planned |
 
 ## Run locally (demo profile)
@@ -50,6 +50,10 @@ Then open `http://127.0.0.1:8000/api/v1/health` or the interactive docs at `/doc
 | `POST/GET /api/v1/courses/{id}/conversations` | Bearer | create (optional `title`) / list the course's conversations |
 | `GET/DELETE /api/v1/conversations/{id}` | Bearer | detail with the message history / delete |
 | `POST /api/v1/conversations/{id}/messages` | Bearer | `question` (1-2000 characters), optional `document_ids`; answers only from the course's `ready` documents; `state` is `answered`, `partial`, `low_confidence` or `refused` (with `refusal_reason` and `notice`); numbered citations with document, page/slide and passage. Render `text` as plain text, never as HTML |
+| `GET /api/v1/documents/{id}/summary` | Bearer | the stored summary (`status` `ready` / `generating` / `failed`, `pending`, sections with `[n]` citations and page/slide ranges); 404 when none was requested |
+| `POST /api/v1/documents/{id}/summary` | Bearer | `{regenerate?}`; 200 with the stored summary, or 202 when a generation is queued; 409 if the document is not ready; 503 without a model provider |
+| `POST/GET /api/v1/courses/{id}/quizzes` | Bearer | create (`document_ids?` 1-20, `question_count` 5-30, `question_types` `mcq` / `true_false`, `title?`; 202) / list |
+| `GET/DELETE /api/v1/quizzes/{id}`, `POST /api/v1/quizzes/{id}/regenerate` | Bearer | questions show only `stem`, `options`, `topic`, `difficulty`, `cognitive_level`: never the answer, rationale or evidence. `status` `invalid` after a source document was deleted (regenerate it) |
 
 Access tokens are accepted only in `Authorization: Bearer ...` (never query strings or cookies). The browser keeps
 the access token in memory and calls `refresh` when it expires (15 minutes). Over plain `http://localhost` browsers
@@ -72,6 +76,8 @@ All settings are environment variables with the prefix `INTELLISTUDY_` (see `.en
 | `INTELLISTUDY_MAX_UPLOAD_BYTES` | 100 MB | per file (used from M2) |
 | `INTELLISTUDY_LLM_DAILY_TOKEN_BUDGET` | 200000 | prompt + completion tokens per user per UTC day; 429 before any provider call when spent |
 | `INTELLISTUDY_CHAT_RETRIEVAL_K` / `INTELLISTUDY_CHAT_MAX_TOKENS` | 6 / 700 | sources per answer / answer length cap |
+| `INTELLISTUDY_SUMMARY_BATCH_TOKENS` / `INTELLISTUDY_SUMMARY_MAX_TOKENS` | 2500 / 900 | source tokens per summary call / output cap per call |
+| `INTELLISTUDY_QUIZ_BATCH_QUESTIONS` / `INTELLISTUDY_QUIZ_CONTEXT_TOKENS` / `INTELLISTUDY_QUIZ_MAX_TOKENS` | 10 / 5000 / 3500 | questions per call / source tokens per call / output cap |
 
 ## Tests and checks
 

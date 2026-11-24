@@ -35,6 +35,7 @@ from backend.app.services.ai_container import AIContainer
 from backend.app.services.auth import AuthService
 from backend.app.services.chat import ChatService
 from backend.app.services.documents import DocumentService
+from backend.app.services.generation import GenerationRunner, GenerationService
 from backend.app.services.jobs import JobRunner, Parser
 from backend.app.services.storage import FileStorage
 from backend.app.services.usage import UsageLedger
@@ -63,13 +64,17 @@ def create_app(
     ledger = UsageLedger(settings, clock)
     chat = ChatService(settings, ai, limiter, clock, ledger)
     jobs = JobRunner(settings, session_factory, ai, storage, clock, **({"parser": parser} if parser else {}))
+    generation_runner = GenerationRunner(settings, session_factory, ai, clock, ledger)
+    generation = GenerationService(settings, ai, limiter, clock, ledger, generation_runner)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         storage.sweep_incoming()  # FILE-07: partial uploads left by a crash
         if settings.worker_enabled:
             jobs.start()
+            generation_runner.start()
         yield
+        generation_runner.stop()
         jobs.stop()
         ai.close()
         engine.dispose()
@@ -91,6 +96,8 @@ def create_app(
     app.state.chat = chat
     app.state.ledger = ledger
     app.state.jobs = jobs
+    app.state.generation = generation
+    app.state.generation_runner = generation_runner
     app.state.ai = ai
     app.state.clock = clock
     app.state.rate_limiter = limiter

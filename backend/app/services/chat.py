@@ -251,3 +251,7 @@ def _source(source: SourceRef) -> dict[str, object]:
 def _citation(number: int, source: SourceRef) -> dict[str, object]:
     return {"number": number, **_source(source), "context": source.context,
             "low_confidence": source.low_confidence, "generated": source.generated}
+
+
+#: shared with summary and quiz generation
+SafeLLM = _SafeLLM

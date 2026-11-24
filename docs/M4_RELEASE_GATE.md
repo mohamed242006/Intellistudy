@@ -1,8 +1,8 @@
 # M4 Release Gate: Summaries and Quiz Generation
 
 **Status:** release gate for backend milestone M4 (document summaries, multiple-choice and true/false quiz generation).
-**M4 cannot be approved, merged or released unless every item below passes.** Version 1.0, 2026-11-24, written
-before M4 implementation (no M4 code exists when this file is written).
+**M4 cannot be approved, merged or released unless every item below passes.** Version 1.1, 2026-11-24 (v1.0 written
+before M4 implementation; v1.1: G4-PRV-04 wording for blank replies, which F-M3-04 already makes provider failures).
 **Authority:** [`backend_security_contract.md`](backend_security_contract.md) v1.5 (rule ids such as `RET-09`), the
 requirements in `IntelliStudy_Architecture_Design_v1.1.docx` (FR-SUM, FR-QZ, NFR-AVL-03) and the team decisions in
 section 1.2. If this gate and the contract disagree, the contract wins and this file is corrected.
@@ -121,7 +121,7 @@ output, obedient injection replies) or the real provider over a mocked HTTP tran
 | G4-PRV-01 | Timeout, 5xx after retries, 400/401/403, during a summary job | Job `failed` / `llm_unavailable`; no partial summary; a previously stored summary of that document is still served; no 500 anywhere | SEC-06, NFR-AVL-03 |
 | G4-PRV-02 | The same failures during a quiz job | Quiz `failed` / `llm_unavailable`; no questions or keys stored | SEC-06 |
 | G4-PRV-03 | One map call of a multi-call summary fails after others succeeded | The whole summary fails; no summary with skipped parts is ever stored (FR-SUM-05); tokens used are recorded | SEC-06, FR-SUM-05 |
-| G4-PRV-04 | Quiz output that is not JSON, has the wrong schema or extra fields, or is blank / thinking-only | That batch is discarded; at most one top-up call; then D-3 applies (`ready` with fewer, or `failed` / `insufficient_material`) | UPL-14, FR-QZ-05 |
+| G4-PRV-04 | Quiz output that is not JSON, has the wrong schema or extra fields; a blank / thinking-only reply | Unusable output: that batch is discarded, at most one top-up call, then D-3 applies (`ready` with fewer, or `failed` / `insufficient_material`). A blank or thinking-only reply is a provider failure (F-M3-04): `failed` / `llm_unavailable`, reasoning never stored. Nothing is stored either way | UPL-14, FR-QZ-05, SEC-06 |
 | G4-PRV-05 | No provider configured | `POST` summary / quiz / regenerate: 503 `llm_unavailable`, no job; stored summaries, quiz reads, documents and chat history keep working; health 200 | SEC-05, NFR-AVL-03, D-4 |
 | G4-PRV-06 | Provider error body containing the API key and internal details | Not in any response, job status, summary or quiz row, or log | SEC-06 |
 | G4-PRV-07 | The process stops while a summary job and a quiz job are `generating`; the app restarts | Each job is re-queued or failed cleanly; nothing stays `generating` forever; no half-written summary or quiz is visible | NFR-REL-02 |
@@ -193,6 +193,40 @@ output, obedient injection replies) or the real provider over a mocked HTTP tran
 | G4-INJ-03 | Fence closers and fake source tags in document text (`</source>`, `[S9]`, `<source id=...>`) | Neutralised in summary and quiz prompts exactly as in chat; they never become citations or source ids | UPL-14 |
 | G4-INJ-04 | Markdown images, `<img>` and HTML in generated stems and options | Removed or returned as JSON string data (sanitiser applied to stems and options too) | UPL-15, F-M3-02 |
 | G4-INJ-05 | Requests for `short_answer`, `essay`, `adaptive`; model output of those types; OpenAPI route list | Requests -> 422; such model output dropped; no attempt, grading or exam route exists in M4 | T-5, T-6 |
+
+### 2.11 Evidence (local, 2026-11-24)
+
+| Area | Tests | File | Result |
+|---|---|---|---|
+| 2.1 Summary ownership isolation | G4-SIS-01..08 | `backend/tests/test_g4_summaries.py` | pass |
+| 2.2 Quiz ownership isolation | G4-QIS-01..07 | `backend/tests/test_g4_quizzes.py` | pass |
+| 2.3 Shared token budget | G4-BUD-01..07 | `backend/tests/test_g4_budget.py` | pass |
+| 2.4 Provider failure handling | G4-PRV-01..07 | `backend/tests/test_g4_budget.py` | pass |
+| 2.5 Summary citation validation | G4-SCV-01..07 | `backend/tests/test_g4_summaries.py` | pass |
+| 2.6 Quiz answer validation | G4-QAV-01..09 | `backend/tests/test_g4_quizzes.py` | pass |
+| 2.7 No answer-key leakage | G4-KEY-01..06 | `backend/tests/test_g4_quizzes.py` | pass |
+| 2.8 Deletion and invalidation | G4-DEL-01..07 | `backend/tests/test_g4_lifecycle.py` | pass |
+| 2.9 Summary storage | G4-CAC-01..04 | `backend/tests/test_g4_summaries.py` | pass |
+| 2.10 Prompt injection and scope | G4-INJ-01..05 | `backend/tests/test_g4_lifecycle.py` | pass |
+| Traceability | 67 rows map one to one to `test_g4_*` | `backend/tests/test_g1_m0.py` | pass |
+
+- Whole suites: backend 325 tests OK (M1, M2, M3 gates and the F-M3-05 ledger tests included); `ai/` 800 tests OK
+  (`INTELLISTUDY_SKIP_SLOW=1`; unchanged); ruff clean; mypy clean (149 files).
+- Mutation checks (each control removed, gate run, control restored):
+
+| Control removed | Gate tests that fail |
+|---|---|
+| answer key field added to the public question schema | KEY-01, KEY-02, KEY-03 |
+| evidence-quote check | QAV-02 |
+| document-deletion hook (T-1..T-3) | DEL-02, DEL-03, DEL-04, KEY-06 |
+| budget check before each generation call | BUD-03 |
+| "source still ready" re-check before storing a summary | DEL-04 (after adding the "marked `deleting`, not yet purged" case: the foreign key alone had masked it, finding F-M4-01) |
+| server-side option shuffle | QAV-08, KEY-05, INJ-01 |
+| summary grounding check | SCV-04 |
+
+- Background thread: with the runner thread started, a summary and a quiz reach `ready` without test-driven polling.
+- Providers: scripted models or the real `DeepSeekProvider` over a mocked transport; no network call in any test.
+- Findings F-M4-01..04 in the contract's Appendix D.
 
 ---
 

@@ -21,6 +21,7 @@ from backend.app.core.ratelimit import LIMITS, RateLimiter, enforce
 from backend.app.db.base import new_uuid
 from backend.app.db.models import Course, Document, DocumentStatus, JobStatus, ProcessingJob, User
 from backend.app.services.ai_container import AIContainer
+from backend.app.services.lifecycle import on_document_purged
 from backend.app.services.ownership import get_owned
 from backend.app.services.storage import FileStorage
 from backend.app.services.uploads import IncomingFile, discard_all, type_problem
@@ -213,6 +214,7 @@ def purge(session: Session, ai: AIContainer, storage: FileStorage, document: Doc
     owner_id, document_id = document.owner_id, document.id
     ai.remove_document(document_id)
     storage.delete_document(owner_id, document_id)
+    on_document_purged(session, document)  # summaries and quizzes (M4 gate T-1..T-3)
     session.delete(document)
     session.commit()
     logger.info("document %s purged", document_id)
