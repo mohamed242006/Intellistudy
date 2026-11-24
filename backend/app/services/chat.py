@@ -1,7 +1,7 @@
 """Grounded chat (M3; docs/M3_RELEASE_GATE.md).
 
 A question goes through, in order: conversation ownership (OWN-03) -> chat rate limit (9a) -> daily token budget
-(UPL-16) -> READY-only scope (``ScopedRetrieval``, release blocker F-M2-10) -> the unchanged ``AnswerService`` over a
+(UPL-16, read from the usage ledger; every provider call is recorded there, F-M3-05) -> READY-only scope (``ScopedRetrieval``, release blocker F-M2-10) -> the unchanged ``AnswerService`` over a
 ``BoundRetrieval`` and the configured provider -> **citation ownership validation** (every citation from the
 caller's ready documents in this course, passage equal to the retrieved chunk; COW-02/04) -> chat state -> stored
 message with its citations (FR-CIT-05).
@@ -16,10 +16,9 @@ import logging
 import re
 import unicodedata
 from collections.abc import Sequence
-from datetime import datetime, time, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ai.answering import AnswerService
@@ -31,10 +30,11 @@ from backend.app.core.config import Settings
 from backend.app.core.errors import ApiError
 from backend.app.core.logging import security_event
 from backend.app.core.ratelimit import LIMITS, RateLimiter, enforce
-from backend.app.db.models import ChatState, Conversation, Message, User
+from backend.app.db.models import ChatState, Conversation, Message, UsageFeature, User
 from backend.app.services.ai_container import AIContainer
 from backend.app.services.ownership import get_owned
 from backend.app.services.retrieval import ScopedRetrieval, ready_document_ids
+from backend.app.services.usage import MeteredLLM, UsageLedger
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +123,10 @@ class _SafeLLM:
 
 
 class ChatService:
-    def __init__(self, settings: Settings, ai: AIContainer, limiter: RateLimiter, clock: Clock) -> None:
+    def __init__(self, settings: Settings, ai: AIContainer, limiter: RateLimiter, clock: Clock,
+                 ledger: UsageLedger | None = None) -> None:
         self._settings = settings
+        self._ledger = ledger or UsageLedger(settings, clock)
         self._ai = ai
         self._limiter = limiter
         self._clock = clock
@@ -166,15 +168,13 @@ class ChatService:
         if not text or len(text) > MAX_QUESTION_CHARS:
             raise ApiError(422, f"Ask a question of 1-{MAX_QUESTION_CHARS} characters.", code="invalid_question")
         enforce(self._limiter, LIMITS["chat:user"], user.id, actor=user.id)
-        if self._tokens_used_today(session, user) >= self._settings.llm_daily_token_budget:
-            security_event("token_budget_exhausted", user_id=user.id)
-            raise ApiError(429, "Your daily answering budget is used up. Try again tomorrow.", code="token_budget",
-                           headers={"Retry-After": str(self._seconds_to_midnight())})
+        self._ledger.check(session, user.id)
         course, scope = self._scoped.resolve_scope(session, user, conversation.course_id, document_ids)
 
         bound = self._scoped.bind(session, user, course, scope)
         provider = self._ai.provider
-        llm = _SafeLLM(provider) if provider is not None else _UnavailableLLM()
+        llm = (MeteredLLM(_SafeLLM(provider), self._ledger, session, user.id, UsageFeature.CHAT)
+               if provider is not None else _UnavailableLLM())
         service = AnswerService(bound, llm, k=self._settings.chat_retrieval_k,
                                 max_tokens=self._settings.chat_max_tokens)
         answer = service.answer(text, user_id=user.id, course_id=course.id)
@@ -238,17 +238,6 @@ class ChatService:
             return NOTICES[state.value]
         return None
 
-    def _day_start(self) -> datetime:
-        now = self._clock.now()
-        return datetime.combine(now.date(), time.min, tzinfo=now.tzinfo)
-
-    def _seconds_to_midnight(self) -> int:
-        return max(int((self._day_start() + timedelta(days=1) - self._clock.now()).total_seconds()), 1)
-
-    def _tokens_used_today(self, session: Session, user: User) -> int:
-        used = session.scalar(select(func.coalesce(func.sum(Message.prompt_tokens + Message.completion_tokens), 0))
-                              .where(Message.owner_id == user.id, Message.created_at >= self._day_start()))
-        return int(used or 0)
 
 
 def _source(source: SourceRef) -> dict[str, object]:

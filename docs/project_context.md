@@ -229,7 +229,8 @@ Gate: [`M3_RELEASE_GATE.md`](M3_RELEASE_GATE.md), 52 items passing in CI (run #5
 - States, precedence confirmed by the team: `refused` > `partial` > `low_confidence` > `answered`; refusal reasons `no_results`, `not_relevant`, `model_declined`, `uncited_answer`, `unsupported_claims`, `llm_unavailable`, `scope_violation`; each with a fixed notice and the nearest material.
 - Provider failures (timeouts, 429/5xx after retries, 4xx, malformed or blank replies, redirects, no provider configured) become `refused` / `llm_unavailable` with status 201; provider error bodies and reasoning text are never returned, stored or logged.
 - `ai/` change: `AnswerService` takes a `Retriever` protocol (typing only; behaviour unchanged).
-- Tests: 52 M3 gate tests (`backend/tests/test_g3_*.py`) plus traceability; 248 backend tests in total. **Release blocker F-M2-10 closed** (contract v1.4). Not yet done: the optional manual DeepSeek smoke run.
+- Token budget (fixed after approval, F-M3-05): read only from the usage ledger `llm_usage` (one row per provider call, linked only to the user; migration `0005_llm_usage`); deleting conversations, messages, documents or courses refunds nothing (`backend/tests/test_usage_ledger.py`, 9 tests).
+- Tests: 52 M3 gate tests (`backend/tests/test_g3_*.py`) plus traceability; 248 backend tests at approval, 257 with the ledger tests. **Release blocker F-M2-10 closed** (contract v1.4). Not yet done: the optional manual DeepSeek smoke run.
 
 ---
 
@@ -666,6 +667,7 @@ Detail: section 6 (corpus composition and coverage assessment), section 7 (table
 
 ## 13. Changelog of this file
 
+- **2026-11-24 F-M3-05 fixed** (before M4, team decision): usage ledger `llm_usage` is the single source of truth for the daily token budget; §3.15 note; contract v1.6.
 - **2026-11-24 M4 release gate**: `docs/M4_RELEASE_GATE.md` (67 items in 10 areas: summary and quiz isolation, shared token budget, provider failures, summary citation validation, quiz answer validation, no answer-key leakage, deletion and invalidation, summary storage, injection and scope); contract v1.5 (ISO-03, ISO-04, UPL-16; finding F-M3-05: deleting a conversation refunds the M3 token budget); §8 milestone line.
 - **2026-11-24 M3 approved**: CI run #5 green on `f05bf8e`; release blocker F-M2-10 closed (contract v1.4); M3 gate signed off; M2 CI (run #3) recorded; §7 platform bullets brought up to date (quota, upload limits, CI, backend endpoints); §8 marks M4 next.
 - **2026-11-24 M3 implemented**: new §3.15 (conversations and messages, chat flow, states, provider failure handling; 52 gate tests passing locally; findings F-M3-01..04); §8 milestone line; contract v1.3; evidence section 2.9 in `M3_RELEASE_GATE.md`.

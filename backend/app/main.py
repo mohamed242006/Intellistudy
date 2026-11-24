@@ -37,6 +37,7 @@ from backend.app.services.chat import ChatService
 from backend.app.services.documents import DocumentService
 from backend.app.services.jobs import JobRunner, Parser
 from backend.app.services.storage import FileStorage
+from backend.app.services.usage import UsageLedger
 
 
 def create_app(
@@ -59,7 +60,8 @@ def create_app(
     session_factory = create_session_factory(engine)
     storage = FileStorage(settings.storage_root)
     documents = DocumentService(settings, storage, ai, limiter, clock)
-    chat = ChatService(settings, ai, limiter, clock)
+    ledger = UsageLedger(settings, clock)
+    chat = ChatService(settings, ai, limiter, clock, ledger)
     jobs = JobRunner(settings, session_factory, ai, storage, clock, **({"parser": parser} if parser else {}))
 
     @asynccontextmanager
@@ -87,6 +89,7 @@ def create_app(
     app.state.storage = storage
     app.state.documents = documents
     app.state.chat = chat
+    app.state.ledger = ledger
     app.state.jobs = jobs
     app.state.ai = ai
     app.state.clock = clock

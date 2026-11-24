@@ -30,7 +30,7 @@ section 1.2. If this gate and the contract disagree, the contract wins and this 
 | Summaries | `POST /api/v1/documents/{document_id}/summary` `{regenerate?: bool}` -> 202 (generation queued) or 200 (stored summary returned); `GET /api/v1/documents/{document_id}/summary` -> stored summary or generation status |
 | Quizzes | `POST /api/v1/courses/{course_id}/quizzes` `{document_ids?, question_count, question_types}` -> 202; `GET /api/v1/courses/{course_id}/quizzes`; `GET /api/v1/quizzes/{quiz_id}`; `DELETE /api/v1/quizzes/{quiz_id}`; `POST /api/v1/quizzes/{quiz_id}/regenerate` -> 202 |
 | Generation | background jobs on the existing job runner; source text read only through the scoped path (owned **ready** document -> parent store `get_many(keys, user_id, course_id)`, RET-09); prompts fenced as in M3 |
-| Token budget | one per-user daily **usage ledger** shared by chat, summaries and quizzes (replaces the M3 count over stored messages, finding F-M3-05) |
+| Token budget | the per-user daily **usage ledger** (`llm_usage`, built before M4 to fix F-M3-05) extended to summaries and quizzes; multi-call generation re-checks it before every call |
 | Data | `summaries`, `quizzes`, `quiz_sources`, `quiz_questions` (public part), `quiz_answer_keys` (correct answer, rationales, evidence; separate table), `llm_usage` (ledger) |
 
 **Summary** (one per document, decision D-1): sections in document order, each with text carrying `[n]` markers,
@@ -202,5 +202,5 @@ M4 is approved only when the record that completes it (pull request, or this fil
 
 - [ ] CI run link for the commit, all jobs green.
 - [ ] Every `test_g4_*` test passed, no skips (67 items), plus the traceability test; M1, M2 and M3 gates still passing.
-- [ ] Finding F-M3-05 closed (G4-BUD-04 passing; contract Appendix D updated).
+- [ ] G4-BUD-04 passing: deleting summaries and quizzes refunds nothing either (F-M3-05 itself was fixed before M4, contract v1.6).
 - [ ] Evidence: one manual DeepSeek run on real lecture files (one summary of a long PDF, one 10-question quiz): latency against NFR-PER-05 (10-question quiz under 45 s), share of generated questions dropped by validation and why, tokens used. Recorded without document content.

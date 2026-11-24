@@ -14,8 +14,22 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base, Timestamps, UTCDateTime, UUIDPrimaryKey
 
-__all__ = ["Base", "ChatState", "Conversation", "Course", "Document", "DocumentStatus", "JobStatus", "Message",
-           "ProcessingJob", "RefreshToken", "Role", "User"]
+__all__ = [
+    "Base",
+    "ChatState",
+    "Conversation",
+    "Course",
+    "Document",
+    "DocumentStatus",
+    "JobStatus",
+    "LlmUsage",
+    "Message",
+    "ProcessingJob",
+    "RefreshToken",
+    "Role",
+    "UsageFeature",
+    "User",
+]
 
 
 class Role(StrEnum):
@@ -175,3 +189,26 @@ class Message(UUIDPrimaryKey, Timestamps, Base):
     prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+
+
+class UsageFeature(StrEnum):
+    CHAT = "chat"
+    SUMMARY = "summary"
+    QUIZ = "quiz"
+
+
+class LlmUsage(UUIDPrimaryKey, Base):
+    """The daily token budget's single source of truth (contract UPL-16, finding F-M3-05): one row per provider call.
+
+    Deliberately linked to nothing but the user: deleting conversations, messages, summaries, quizzes, documents or
+    courses never removes usage. Holds no content (no question, answer or document text)."""
+
+    __tablename__ = "llm_usage"
+    __table_args__ = (Index("ix_llm_usage_owner_id_created_at", "owner_id", "created_at"),)
+
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    feature: Mapped[str] = mapped_column(String(16), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
+    completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
