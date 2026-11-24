@@ -43,7 +43,8 @@ def health(
         logger.error("health: database check failed (%s)", type(exc).__name__)
         database = "error"
     provider = ai.provider
-    llm = LLMStatus(configured=provider is not None, provider=provider.name if provider else settings.llm_provider.value)
+    name = getattr(provider, "name", "custom") if provider is not None else settings.llm_provider.value
+    llm = LLMStatus(configured=provider is not None, provider=str(name))
     return HealthResponse(
         status="ok" if database == "ok" else "degraded", database=database, llm=llm, models=ai.status()
     )

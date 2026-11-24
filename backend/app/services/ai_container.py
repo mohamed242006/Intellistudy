@@ -16,12 +16,14 @@ from typing import TYPE_CHECKING, Any
 
 from backend.app.core.config import Settings
 from backend.app.providers import build_provider
-from backend.app.providers.openai_compatible import OpenAICompatibleProvider
 
 if TYPE_CHECKING:
     from ai.chunking.indexing import IndexingService
     from ai.chunking.interfaces import Embedder, ParentStore, VectorStore
     from ai.retrieval import RetrievalService
+
+
+_UNSET: Any = object()
 
 
 class _NoEmbedder:
@@ -48,6 +50,7 @@ class AIContainer:
         vector_store: VectorStore | None = None,
         parent_store: ParentStore | None = None,
         reranker: Any = None,
+        provider: Any = _UNSET,
     ) -> None:
         """Components can be injected (tests: fake embedder, in-memory stores); otherwise they load lazily."""
         self._settings = settings
@@ -57,11 +60,13 @@ class AIContainer:
         self._vector_store: VectorStore | None = vector_store
         self._parent_store: ParentStore | None = parent_store
         self._retrieval: RetrievalService | None = None
-        self._provider: OpenAICompatibleProvider | None = build_provider(settings)
+        # tests inject a scripted model or a provider with a mocked transport; None means "no provider configured"
+        self._provider: Any = build_provider(settings) if provider is _UNSET else provider
 
     # ---------------------------------------------------------------------------------------------- status
     @property
-    def provider(self) -> OpenAICompatibleProvider | None:
+    def provider(self) -> Any:
+        """The configured LLM provider (``LLMClient``), or None."""
         return self._provider
 
     def status(self) -> dict[str, bool]:
@@ -141,7 +146,7 @@ class AIContainer:
         return service.remove_document(document_uid)
 
     def close(self) -> None:
-        if self._provider is not None:
+        if self._provider is not None and hasattr(self._provider, "close"):
             self._provider.close()
         if self._parent_store is not None and hasattr(self._parent_store, "close"):
             self._parent_store.close()

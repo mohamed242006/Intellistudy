@@ -33,6 +33,7 @@ from backend.app.core.tokens import TokenService
 from backend.app.db.session import create_db_engine, create_session_factory
 from backend.app.services.ai_container import AIContainer
 from backend.app.services.auth import AuthService
+from backend.app.services.chat import ChatService
 from backend.app.services.documents import DocumentService
 from backend.app.services.jobs import JobRunner, Parser
 from backend.app.services.storage import FileStorage
@@ -58,6 +59,7 @@ def create_app(
     session_factory = create_session_factory(engine)
     storage = FileStorage(settings.storage_root)
     documents = DocumentService(settings, storage, ai, limiter, clock)
+    chat = ChatService(settings, ai, limiter, clock)
     jobs = JobRunner(settings, session_factory, ai, storage, clock, **({"parser": parser} if parser else {}))
 
     @asynccontextmanager
@@ -84,6 +86,7 @@ def create_app(
     app.state.session_factory = session_factory
     app.state.storage = storage
     app.state.documents = documents
+    app.state.chat = chat
     app.state.jobs = jobs
     app.state.ai = ai
     app.state.clock = clock

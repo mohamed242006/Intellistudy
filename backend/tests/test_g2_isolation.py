@@ -62,6 +62,7 @@ class DocumentIsolationTests(M2Case):
             self.assertEqual((record["user_id"], record["course_id"], record["document_uid"]),
                              (row.owner_id, row.course_id, row.id))
             self.assertTrue(record["id"].startswith(f"{row.id}:"))
+            self.assertEqual(record["file_name"], row.file_name)  # the user's name, never the stored "original.pdf"
         keys = sorted(self.parent_keys(self.a_doc))
         self.assertTrue(keys)
         self.assertEqual(len(self.parents.get_many(keys, user_id=self.a_id, course_id=self.a_course)), len(keys))

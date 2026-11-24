@@ -9,12 +9,13 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import JSON, Boolean, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base, Timestamps, UTCDateTime, UUIDPrimaryKey
 
-__all__ = ["Base", "Course", "Document", "DocumentStatus", "JobStatus", "ProcessingJob", "RefreshToken", "Role", "User"]
+__all__ = ["Base", "ChatState", "Conversation", "Course", "Document", "DocumentStatus", "JobStatus", "Message",
+           "ProcessingJob", "RefreshToken", "Role", "User"]
 
 
 class Role(StrEnum):
@@ -130,3 +131,47 @@ class ProcessingJob(UUIDPrimaryKey, Timestamps, Base):
     error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class Conversation(UUIDPrimaryKey, Timestamps, Base):
+    """A chat thread bound to one course (a message can never switch course; contract RET-02)."""
+
+    __tablename__ = "conversations"
+    __table_args__ = (Index("ix_conversations_owner_id", "owner_id"), Index("ix_conversations_course_id", "course_id"))
+
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    course_id: Mapped[str] = mapped_column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+
+
+class ChatState(StrEnum):
+    """M3 gate state rule; precedence refused > partial > low_confidence > answered (confirmed 2026-11-24)."""
+
+    REFUSED = "refused"
+    PARTIAL = "partial"
+    LOW_CONFIDENCE = "low_confidence"
+    ANSWERED = "answered"
+
+
+class Message(UUIDPrimaryKey, Timestamps, Base):
+    """One question and its answer, stored with its citations (FR-CIT-05)."""
+
+    __tablename__ = "messages"
+    __table_args__ = (Index("ix_messages_conversation_id", "conversation_id"), Index("ix_messages_owner_id", "owner_id"))
+
+    conversation_id: Mapped[str] = mapped_column(String(36), ForeignKey("conversations.id", ondelete="CASCADE"),
+                                                 nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(String(16), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    citations: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
+    refusal_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    notice: Mapped[str | None] = mapped_column(Text, nullable=True)
+    missing_terms: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    nearest: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
+    warnings: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)

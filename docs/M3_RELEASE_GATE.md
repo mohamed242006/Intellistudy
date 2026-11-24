@@ -141,6 +141,28 @@ reranker's name, in-memory vector and parent stores; scripted LLM replies or a m
 | G3-SCP-05 | Retrieval configuration | Reranker configured and the calibrated relevance policy applied (assessment present); no configuration path disables it | RET-10 |
 | G3-SCP-06 | A conversation's course is deleted | Its conversations and messages are removed (ISO-03); later requests get the same 404 | ISO-03 |
 
+### 2.9 Evidence (local, 2026-11-24)
+
+| Area | Tests | File | Result |
+|---|---|---|---|
+| 2.1 READY-only retrieval | G3-RDY-01..07 | `backend/tests/test_g3_ready.py` | pass |
+| 2.2 Cross-user retrieval isolation | G3-XUR-01..07 | `backend/tests/test_g3_isolation.py` | pass |
+| 2.3 Citation presence | G3-CIT-01..05 | `backend/tests/test_g3_citations.py` | pass |
+| 2.4 Citation ownership validation | G3-COW-01..05 | `backend/tests/test_g3_citations.py` | pass |
+| 2.5 Prompt-injection regression | G3-PI-01..07 | `backend/tests/test_g3_injection.py` | pass |
+| 2.6 Chat states | G3-ST-01..06 | `backend/tests/test_g3_states.py` | pass |
+| 2.7 DeepSeek provider failure handling | G3-PRV-01..09 | `backend/tests/test_g3_provider.py` | pass |
+| 2.8 Retrieval scope validation | G3-SCP-01..06 | `backend/tests/test_g3_isolation.py` | pass |
+| Traceability | 52 rows map one to one to `test_g3_*` | `backend/tests/test_g1_m0.py` | pass |
+
+- Whole suites: backend 248 tests OK (M1 and M2 gates included), `ai/` 800 tests OK (`INTELLISTUDY_SKIP_SLOW=1`; 17 skipped, 1 expected failure, unchanged); ruff clean; mypy clean (134 files).
+- Mutation checks (each control removed, then restored with 0 failures):
+  - ready-only layer: allowlist widened -> 3 failures; post-search re-check removed -> 1; `document_uids` dropped -> 18;
+  - answer sanitiser removed -> G3-PI-06 fails (exfil-image, exfil-html);
+  - citation validation removed from `ask()` -> G3-COW-02 fails (G3-COW-04 calls the validator directly).
+- Providers: the real `DeepSeekProvider` runs against a mocked HTTP transport; no network call and no real key in any test.
+- Findings: F-M3-01..04 in the contract's Appendix D.
+
 ---
 
 ## 3. Sign-off

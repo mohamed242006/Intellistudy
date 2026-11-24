@@ -17,7 +17,7 @@ from ai.answering.llm import ScriptedLLM
 from backend.app.db.models import Document, DocumentStatus, User
 from backend.app.services.retrieval import NO_READY_DOCUMENTS, RETRIEVABLE_STATUSES
 from backend.tests import m2_fixtures as fx
-from backend.tests.m3_base import M3Case
+from backend.tests.m3_base import ChatCase, M3Case
 
 ROOT = Path(__file__).resolve().parents[2]
 READY_TEXT = "Zebra stripes confuse predators in the savanna grasslands. " * 6
@@ -26,7 +26,7 @@ HIDDEN_QUERY = "Why do quokka marsupials smile on Rottnest island?"
 NON_READY = [s.value for s in DocumentStatus if s is not DocumentStatus.READY]
 
 
-class ReadyOnlyCase(M3Case):
+class ReadyOnlyCase(ChatCase):
     def setUp(self) -> None:
         super().setUp()
         self.ready_doc = self.upload_ok(self.a, self.a_token, self.a_course, ("zebra.pdf", fx.pdf_bytes(text=READY_TEXT)))[0]["id"]
@@ -103,6 +103,15 @@ class ReadyOnlyRetrievalTests(ReadyOnlyCase):
         self.assertNotIn(self.hidden_doc, {c.source.document_uid for c in answer.citations})
         self.assertNotIn(self.hidden_doc, {s.document_uid for s in answer.sources})
         self.assertTrue(answer.refused or all(c.source.document_uid == self.ready_doc for c in answer.citations))
+
+        # the same through the chat endpoint (end to end)
+        endpoint_llm = self.set_model(lambda messages: "Quokkas smile on Rottnest island [S1].")
+        conversation = self.conversation(self.a, self.a_token, self.a_course)
+        message = self.ask_ok(self.a, self.a_token, conversation, HIDDEN_QUERY)
+        self.assertNotIn("Quokka marsupials smile", self.prompts(endpoint_llm))
+        self.assertNotIn(self.hidden_doc, {c["document_id"] for c in message["citations"]})
+        self.assertNotIn(self.hidden_doc, {s["document_id"] for s in message["nearest"]})
+        self.assertTrue(message["state"] == "refused" or {c["document_id"] for c in message["citations"]} <= {self.ready_doc})
 
 
 class LiveIndexingRaceTests(ReadyOnlyCase):

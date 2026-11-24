@@ -114,8 +114,8 @@ class OpenAICompatibleProvider:
     def parse(self, data: dict[str, Any], latency: float) -> LLMResponse:
         choice = data["choices"][0]
         text = (choice.get("message") or {}).get("content")
-        if not isinstance(text, str):
-            raise ValueError("no text in reply")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("no text in reply")  # incl. thinking-mode replies with only reasoning_content (F-M3-04)
         usage = data.get("usage") or {}
         return LLMResponse(
             text=text,

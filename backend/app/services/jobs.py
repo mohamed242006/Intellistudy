@@ -11,6 +11,7 @@ startup. Claiming uses a conditional UPDATE, so two runners can never take the s
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import threading
 from collections.abc import Callable
@@ -163,10 +164,13 @@ class JobRunner:
             if (chunk.user_id, chunk.course_id, chunk.document_uid) != (owner_id, document["course_id"], document_id):
                 security_event("chunk_scope_mismatch", document_id=document_id)
                 return "invalid_output"
+        # the parser only knows the stored name ("original.pdf"); citations must show the user's file name
+        children = [dataclasses.replace(c, file_name=document["file_name"]) for c in outcome.children]
+        parents = [dataclasses.replace(p, file_name=document["file_name"]) for p in outcome.parents]
         self._stage(owner_id, document_id, DocumentStatus.EMBEDDING, page_count=outcome.page_count)
         indexing = self._ai.indexing()
         self._stage(owner_id, document_id, DocumentStatus.INDEXING)
-        indexing.index(outcome.children, document_uid=document_id, parents=outcome.parents)
+        indexing.index(children, document_uid=document_id, parents=parents)
         self._stage(owner_id, document_id, DocumentStatus.READY, chunk_count=len(outcome.children),
                     warnings=outcome.warnings, ready=True)
         return ""
@@ -193,7 +197,7 @@ class JobRunner:
             if ready:
                 document.ready_at = self._clock.now()
             session.commit()
-            return {"file_type": document.file_type, "course_id": document.course_id}
+            return {"file_type": document.file_type, "course_id": document.course_id, "file_name": document.file_name}
 
     def _fail(self, job_id: str, owner_id: str, document_id: str, code: str) -> None:
         with self._sessions() as session:

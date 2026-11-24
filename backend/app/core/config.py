@@ -125,6 +125,9 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None  # None = the provider's default; configuration only, never user input (SEC-07)
     llm_timeout_seconds: float = Field(default=60.0, gt=0)  # NFR-REL-03
     llm_max_retries: int = Field(default=2, ge=0, le=5)
+    llm_daily_token_budget: int = Field(default=200_000, gt=0)  # per user per UTC day (UPL-16, OWASP LLM10)
+    chat_retrieval_k: int = Field(default=6, ge=1, le=20)
+    chat_max_tokens: int = Field(default=700, ge=50, le=4000)
     deepseek_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
 

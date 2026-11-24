@@ -11,7 +11,7 @@ RET-06, ...) are cited in code and tests.
 | M0 | Foundations + security baseline: settings, logging with redaction, RFC 7807 errors, security headers, CORS allowlist, body limits, rate-limit scaffold, SQLAlchemy + Alembic, LLM provider interface (DeepSeek / OpenAI / local), AI service container, `/api/v1/health`, CI | done |
 | M1 | Identity, courses, ownership: register/login/refresh/logout/logout-all/me/change-password, Argon2id, HS256 access tokens, rotating refresh tokens with reuse detection, lockout, rate limits, course CRUD through `get_owned`; release gate `docs/SECURITY_MERGE_GATE.md` (79 items, all passing) | done (CI green) |
 | M2 | Documents and processing: streaming upload, file validation, ZIP-bomb and encryption checks, ownership-safe storage, sandboxed parser process, job runner; gate M2 section (39 items) | done (CI on push) |
-| M3 | Grounded chat | next |
+| M3 | Grounded chat: conversations, messages, READY-only scoped retrieval, citation validation, answer sanitising, chat states, provider failure handling, token budget; release gate `docs/M3_RELEASE_GATE.md` (52 items, all passing locally) | done (CI on push) |
 | M4-M5 | Summaries + quiz generation, quiz taking + demo | planned |
 
 ## Run locally (demo profile)
@@ -46,6 +46,9 @@ Then open `http://127.0.0.1:8000/api/v1/health` or the interactive docs at `/doc
 | `GET /api/v1/courses/{id}/documents`, `GET /api/v1/documents/{id}` | Bearer | status (`queued`, `extracting`, `embedding`, `indexing`, `ready`, `failed`), progress, page/chunk counts, `error_code` + `error_message` |
 | `GET /api/v1/documents/{id}/file` | Bearer | the original, as an attachment |
 | `POST /api/v1/documents/{id}/retry`, `DELETE /api/v1/documents/{id}` | Bearer | retry failed documents; delete removes vectors, parents and the file |
+| `POST/GET /api/v1/courses/{id}/conversations` | Bearer | create (optional `title`) / list the course's conversations |
+| `GET/DELETE /api/v1/conversations/{id}` | Bearer | detail with the message history / delete |
+| `POST /api/v1/conversations/{id}/messages` | Bearer | `question` (1-2000 characters), optional `document_ids`; answers only from the course's `ready` documents; `state` is `answered`, `partial`, `low_confidence` or `refused` (with `refusal_reason` and `notice`); numbered citations with document, page/slide and passage. Render `text` as plain text, never as HTML |
 
 Access tokens are accepted only in `Authorization: Bearer ...` (never query strings or cookies). The browser keeps
 the access token in memory and calls `refresh` when it expires (15 minutes). Over plain `http://localhost` browsers
@@ -66,6 +69,8 @@ All settings are environment variables with the prefix `INTELLISTUDY_` (see `.en
 | `INTELLISTUDY_DATABASE_URL` | `sqlite:///data/backend/intellistudy.sqlite3` | a PostgreSQL URL works without code changes |
 | `INTELLISTUDY_CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173` | comma-separated; wildcards rejected |
 | `INTELLISTUDY_MAX_UPLOAD_BYTES` | 100 MB | per file (used from M2) |
+| `INTELLISTUDY_LLM_DAILY_TOKEN_BUDGET` | 200000 | prompt + completion tokens per user per UTC day; 429 before any provider call when spent |
+| `INTELLISTUDY_CHAT_RETRIEVAL_K` / `INTELLISTUDY_CHAT_MAX_TOKENS` | 6 / 700 | sources per answer / answer length cap |
 
 ## Tests and checks
 

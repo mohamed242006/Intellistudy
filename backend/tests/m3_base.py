@@ -47,3 +47,44 @@ class M3Case(M2Case):
             user = session.scalars(select(User).where(User.id == user_token_owner)).one()
             course, scope = self.scoped.resolve_scope(session, user, course_id, document_ids)
             return self.scoped.search(session, user, course, scope, query, k=6)
+
+
+class ChatCase(M3Case):
+    """M3 chat helpers: conversations, questions, and a scripted model in place of DeepSeek."""
+
+    def set_model(self, replies: Any) -> Any:
+        from ai.answering.llm import ScriptedLLM
+
+        llm = ScriptedLLM(replies) if not hasattr(replies, "generate") else replies
+        self.app.state.ai._provider = llm
+        return llm
+
+    def doc(self, client: Any, token: str, course_id: str, name: str, text: str) -> str:
+        from backend.tests import m2_fixtures as fx
+
+        document_id = str(self.upload_ok(client, token, course_id, (name, fx.pdf_bytes(text=text)))[0]["id"])
+        self.process()
+        return document_id
+
+    def conversation(self, client: Any, token: str, course_id: str) -> str:
+        response = client.post(f"/api/v1/courses/{course_id}/conversations", json={"title": "Study"},
+                               headers=self.bearer(token))
+        self.assertEqual(response.status_code, 201, response.text)
+        return str(response.json()["id"])
+
+    def ask(self, client: Any, token: str, conversation_id: str, question: str, **extra: Any) -> Any:
+        return client.post(f"/api/v1/conversations/{conversation_id}/messages",
+                           json={"question": question, **extra}, headers=self.bearer(token))
+
+    def ask_ok(self, client: Any, token: str, conversation_id: str, question: str, **extra: Any) -> dict[str, Any]:
+        response = self.ask(client, token, conversation_id, question, **extra)
+        self.assertEqual(response.status_code, 201, response.text)
+        return dict(response.json())
+
+    @staticmethod
+    def prompts(llm: Any) -> str:
+        return "\n".join(m.content for call in llm.calls for m in call)
+
+
+ZEBRA = "Zebra stripes confuse predators in the savanna grasslands. " * 6
+QUOKKA = "Quokka marsupials smile on Rottnest island near Perth. " * 6
