@@ -6,7 +6,8 @@ Graduation project, Computer Engineering, Ain Shams University, team of four.
 > **How to use this file.** It describes what exists in the repository today, why it was built that way,
 > how it was validated, and what is still open. Read sections 2-5 before touching `ai/`.
 > Assumed reader: an engineer or an AI assistant continuing the work with no other context.
-> Last updated: 2026-11-23 (DeepSeek evaluation, move to Linux, equation-extraction investigation, see 12). Commit state:
+> Last updated: 2026-11-24 (Backend Vertical Slice recorded as the active priority; future-work register added as section 12;
+> earlier passes: DeepSeek evaluation, move to Linux, equation-extraction investigation; see 13). Commit state:
 > commit `1660115` holds ingestion, chunking, embedding, Chroma, the SQLite parent store and the base retrieval service;
 > commit `1a38fad` ("Answering+ eval pt1") holds everything added up to 2026-11-15 (answer layer, retrieval add-ons,
 > figure modules, `evaluation/`, `docs/`). Uncommitted as of 2026-11-23: `requirements.lock.txt` and the 2026-11-23 doc
@@ -401,18 +402,19 @@ Platform
 15. Stronger-model run (2026-11-23): DeepSeek flash through the unchanged stack on the pinned retrieval cache, live policy A plus offline B1 / C replays, scored, root-caused and checksummed; evaluation milestone closed (section 11.2, `real_model_eval_report.md` section 11). Move to Linux with a pinned Python 3.12 environment the same day.
 
 ### In progress
-- Housekeeping: commit the work (incl. `requirements.lock.txt` and the 2026-11-23 doc edits), keep this file current; archive `evaluation/results/` outside the machine (git-ignored, checksummed).
+- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Backend planning starts next; its scope is not yet written down in this file. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
+- Housekeeping: keep this file current; push branch `post-eval-quality`; archive `evaluation/results/` outside the machine (git-ignored, checksummed).
 - Table retrieval quality and table spacer columns (known issues).
 
 ### Planned (next first)
 15b. **Finish the stronger-model evaluation**: hand-label the judge-validation sheet (now the blocker for the M3/M4 verdict; consider adding DeepSeek sentences to it), decide the governing thresholds, then decide the grounding policy and calibrate `min_support`. (The newline/list citation-parsing property was fixed on 2026-11-23.)
 15c. **Document context in chunks (F-COV-3; decision needed before implementing).** Add a document label (informative title, else file name) to the embedded text and the reranker passage, then re-embed the corpus, recalibrate the relevance policy on the 87 labelled queries and build a new pinned retrieval cache. *Expected gain (measured at chunk level, estimate overall):* at most +2 answerable cases (a04, x01): DeepSeek 68/72 -> about 70/72 (0.94 -> 0.97), within the benchmark's noise. *Costs/risks:* every chunk re-embedded; relevance policy re-calibrated; new retrieval baseline (the identical-retrieval comparison with the Qwen runs ends unless Qwen is re-run, about 3.5 h CPU); 11 of 28 retrieved files have a generic, missing or copied title and some file names are meaningless (`hard_PDF_1`), so the label needs a heuristic. Also relevant: table-of-contents pages outrank content for heading-like queries (p. 2 "Contents" is in a04's top 6).
-16. **Equation extraction without vision** (investigation done 2026-11-23; F-COV-2 and E2E-12).
+16. **Equation extraction without vision** (investigation done 2026-11-23; F-COV-2 and E2E-12). **Parked** (2026-11-24); tracked as FW-1 in section 12.
     - *Measured:* `SPE_l1.pptx` holds 52 unique `Equation.3` objects on 21 slides (not 104); each is an OLE2 part with an `Equation Native` stream of MTEF v3 data (Equation Editor 3.0, Windows); no OMML (`m:oMath`) exists in the corpus. A throwaway decoder (not in the repository) parsed all 52 without error; characters, Greek letters, fractions, piles, sums and sub/superscripts are present in the data, but its template-selector table was guessed and must come from the official MTEF v3 specification (MathType SDK / Wiris "MTEF v.3 (Equation Editor 3.x)").
     - *Plan (not started):* (1) `ai/ingestion/equations.py`: a bounds-checked MTEF v3 reader producing linear text (e.g. `ρ = λ / (c·μ)`) and, optionally, LaTeX; Symbol-font code mapping for Greek/operators; never executes or trusts object data (Equation Editor 3.0 was an exploited attack surface, CVE-2017-11882), size and recursion limits, any decode failure = existing mild-skip warning. (2) PPTX reader: read `Equation.3` graphic frames once (ignore the `mc:Fallback` duplicate) and emit a new block type or a paragraph block marked as equation, in reading order, with the slide's heading path; confidence 1.0 when decoded. Needs `olefile` (new dependency) or a minimal CFB reader. (3) Chunking: equation text joins the surrounding prose (not an isolated atom), so `L = λW` lands beside its explanation; a chunker version bump changes only the affected chunk ids. (4) Tests: fixtures built from the 52 real objects with hand-checked expected text; synthetic malformed streams. (5) Measurement: the 111-case benchmark has no equation question (the SPE_l1 cases a31-a35, x03, x14 ask about prose), so add about 10-15 equation questions on SPE_l1 (Little's law, utilisation, M/M/1 and M/M/c state probabilities, M/M/1/K) and score retrieval before/after; DOCX equations (OMML or OLE) and the PDF fragment merge (E2E-12) follow as separate steps.
     - *Decisions (open):* text form (linear Unicode vs LaTeX vs both: embeddings read linear text better, LLMs read LaTeX well); whether to add `olefile`.
-17. **Figure-question benchmark** on the content that needs it (Section 02, the SPE_l1 chart, hard_PDF_1, a few AOP diagrams; about 30-40 questions), Phase 0 baseline scored first. Annotation can start in parallel with 15.
-18. **Vision bake-off** (decision on a Vision LLM for figures): only on the benchmark of 17, requiring a measurable gain over Phase 0 (see `phase0_report.md` section 5); needs the team's answers on GPU, privacy and budget (`multimodal_ingestion_design.md` sections 12 and 14).
+17. **Figure-question benchmark** on the content that needs it (Section 02, the SPE_l1 chart, hard_PDF_1, a few AOP diagrams; about 30-40 questions), Phase 0 baseline scored first. Annotation can start in parallel with 15. **Parked** (2026-11-24); tracked as FW-2 in section 12.
+18. **Vision bake-off** (decision on a Vision LLM for figures): only on the benchmark of 17, requiring a measurable gain over Phase 0 (see `phase0_report.md` section 5); needs the team's answers on GPU, privacy and budget (`multimodal_ingestion_design.md` sections 12 and 14). **Parked** (2026-11-24); tracked as FW-2 in section 12.
 19. Gemma 3 27B on the same protocol as 15, if an OpenAI-compatible endpoint (hosted or GPU) is available; Gemma 3 4B is not planned (another CPU floor).
 20. Answer layer productisation: HTTP endpoint with the chat states of `figma_ui_context.md`, multi-turn history, rate limits and cost accounting, ToC-chunk handling.
 21. Summarization
@@ -467,7 +469,7 @@ Prerequisites met: calibrated relevance policy, reranker, labelled evaluation se
 - **Arabic / multilingual** content.
 - **Version control hygiene**: work after commit `1660115` is uncommitted.
 
-Verdict: the data, retrieval and answer-layer machinery (scoping, citations, refusal, grounding) are in place and tested. With a capable hosted model (DeepSeek flash, 2026-11-23) the unchanged stack answers 94% (68/72) of answerable questions correctly under the shipped policy, refuses every out-of-scope question and invents no numbers; with Qwen2.5-3B it was 56%. What is unproven is faithfulness, because the measurement (NLI judge) is not yet trustworthy. The remaining visible losses are chunks without document context (F-COV-3, 2 cases) and equations that never reach the index (F-COV-2). The system as a whole is not production-ready (no backend API, auth, frontend, deployment).
+Verdict: the data, retrieval and answer-layer machinery (scoping, citations, refusal, grounding) are in place and tested. With a capable hosted model (DeepSeek flash, 2026-11-23) the unchanged stack answers 94% (68/72) of answerable questions correctly under the shipped policy, refuses every out-of-scope question and invents no numbers; with Qwen2.5-3B it was 56%. What is unproven is faithfulness, because the measurement (NLI judge) is not yet trustworthy. The remaining visible losses are chunks without document context (F-COV-3, 2 cases) and equations that never reach the index (F-COV-2). The system as a whole is not production-ready (no backend API, auth, frontend, deployment). Beyond those, section 12 lists the high-priority quality items (FW-1 to FW-5) to complete before production deployment.
 
 ---
 
@@ -536,7 +538,86 @@ Full record: [`real_model_eval_report.md`](real_model_eval_report.md) section 10
 
 ---
 
-## 12. Changelog of this file
+## 12. Future Work (High Priority Before Production Deployment)
+
+These items are **not current sprint work** and do **not** block backend implementation, frontend implementation or demo
+delivery. They are high-value production-readiness improvements that should be completed **before production deployment**
+and stay explicitly tracked here. They do not change the order of section 8: the active priority is the Backend Vertical
+Slice; equation extraction and vision work stay parked. Status lines restate measured facts from the sections referenced.
+
+### FW-1: Advanced Equation Extraction
+Current status:
+- 52 unique Equation Editor objects identified in `SPE_l1.pptx` (21 slides; the earlier count of 104 counted each object twice).
+- All equations are recoverable from their embedded `Equation Native` streams (MTEF v3; a throwaway decoder read 52/52).
+- The current benchmark contains no equation-focused questions.
+
+Goal:
+- Extract equations into a canonical structured form.
+- Store linear-text and LaTeX representations.
+- Index equations for retrieval.
+- Add equation-focused benchmark questions.
+
+Detail: section 8 item 16 (plan, security limits, open decisions), section 7 F-COV-2; related E2E-12 (fragmented PDF formulas).
+
+### FW-2: Figure and Diagram Understanding
+Current status:
+- Figure infrastructure exists (detection, selection, figure chunks and citations; section 3.8).
+- Figure retrieval exists.
+- Vision is not currently required for benchmark performance (2 of 72 answerable cases are figure questions; coverage assessment in section 6).
+
+Goal:
+- Build a dedicated figure benchmark.
+- Support diagrams, workflow charts, architecture figures, scientific figures and research-paper visuals.
+- Evaluate vision-capable models.
+- Improve figure-grounded citation quality.
+
+Detail: section 8 items 17-18, section 3.11 (`FigureDescriber` plug-in point), `multimodal_ingestion_design.md` sections 12 and 14.
+
+### FW-3: Judge Validation and Evaluation Reliability
+Current status:
+- The NLI judge appears overly strict (judge disagreements: 24 of 30 rejected sentences for Qwen, 74 of 84 for DeepSeek).
+- The human-labelled validation set is not yet completed (`evaluation/handlabel/`).
+
+Goal:
+- Validate faithfulness metrics against human labels.
+- Recalibrate faithfulness and hallucination scoring.
+- Increase the trustworthiness of evaluation results.
+
+Detail: section 7 (NLI judge), section 8 item 15b, section 11.2 (verdict pending judge validation).
+
+### FW-4: Advanced Citation and Attribution Quality
+Current status:
+- Citation parsing improvements completed (list-aware parser, 2026-11-23; policy A removals 72 -> 34 on the DeepSeek replies).
+- Remaining edge cases include code blocks (fenced code parsed line by line) and metric alignment (the evaluation splitter differs from the parser).
+
+Goal:
+- Improve sentence attribution accuracy.
+- Improve citation coverage reporting.
+- Improve grounding robustness.
+- Ensure citations remain highly reliable at production scale.
+
+Detail: section 7 (citation-parsing and evaluation-splitter bullets), `real_model_eval_report.md` section 12; grounding-policy decision in section 8 item 15b.
+
+### FW-5: Stress-Test Corpus Expansion
+Current status:
+- The evaluation corpus contains 30 benchmark documents (15 PDF, 10 PPTX, 5 DOCX; 111 cases).
+- DeepSeek achieved strong results on the existing benchmark (correctness 68/72 = 0.94; section 11.2).
+
+Goal:
+- Create a harder benchmark corpus.
+- Include equation-heavy PDFs.
+- Include table-heavy PDFs.
+- Include research papers.
+- Include diagram-heavy educational content.
+- Expand evaluation coverage beyond the current benchmark.
+
+Detail: section 6 (corpus composition and coverage assessment), section 7 (table retrieval, dense-math retrieval).
+
+---
+
+## 13. Changelog of this file
+
+- **2026-11-24 priorities and future-work register** (docs only): Backend Vertical Slice recorded as the active priority in §8 "In progress"; items 16-18 marked parked (FW-1, FW-2) without reordering §8; new §12 "Future Work (High Priority Before Production Deployment)" with FW-1 to FW-5; §10 points to it; changelog renumbered 12 -> 13; header updated.
 
 - **2026-11-23 post-evaluation quality pass** (branch `post-eval-quality`): §7 citation-parsing bullet marked fixed (list-aware parser, replay-measured), new bullet on the evaluation splitter; F-COV-3 re-diagnosed (document context, not timeline flattening); §8 items 15b and 15c; §10/§11.2 wording. `real_model_eval_report.md` sections 12 (parser fix) and 13 (F-COV-3).
 - **2026-11-23 evaluation milestone closed**: `root_cause_deepseek-chat.json` and `runs_2026-11/SHA256SUMS.txt` produced; §11.2 failures re-stated from `root_cause`, judge check stated with the `root_cause` instrument (74/84), conclusions added (retrieval not the bottleneck, model capability was); §7 NLI bullet, §8 items 15 and housekeeping updated. `real_model_eval_report.md` section 11 (final summary) added.
