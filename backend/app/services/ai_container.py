@@ -47,12 +47,13 @@ class AIContainer:
         embedder: Embedder | None = None,
         vector_store: VectorStore | None = None,
         parent_store: ParentStore | None = None,
+        reranker: Any = None,
     ) -> None:
         """Components can be injected (tests: fake embedder, in-memory stores); otherwise they load lazily."""
         self._settings = settings
         self._lock = threading.RLock()
         self._embedder: Embedder | None = embedder
-        self._reranker: Any = None
+        self._reranker: Any = reranker
         self._vector_store: VectorStore | None = vector_store
         self._parent_store: ParentStore | None = parent_store
         self._retrieval: RetrievalService | None = None

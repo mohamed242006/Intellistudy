@@ -22,7 +22,7 @@ Related documents in `docs/`: `chunking_design_spec.md` (original chunking rules
 (validation log, closed 2026-10-18), `e2e_validation_report.md` (30-file run), `multimodal_ingestion_design.md` (figure design),
 `phase0_report.md` (E2E-07, E2E-10, figure Phase 0), `answer_layer.md` (answer layer MVP, E2E-08), `real_model_eval_plan.md` /
 `real_model_eval_report.md` (Qwen2.5-3B evaluation), `figma_ui_context.md` (UI source of truth),
-`backend_security_contract.md` (authoritative backend security reference, 2026-11-24), `IntelliStudy_Architecture_Design_v1.1.docx`
+`backend_security_contract.md` (authoritative backend security reference, 2026-11-24), `SECURITY_MERGE_GATE.md` (M1/M2 gates), `M3_RELEASE_GATE.md` (M3 gate), `IntelliStudy_Architecture_Design_v1.1.docx`
 (architecture design, Word). The four design documents named first carry a "superseded in part" banner listing what changed.
 
 ---
@@ -219,7 +219,7 @@ Gate: [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md), M2 section, 39 items p
 - Jobs: `processing_jobs` table, one in-process runner thread, atomic claim by conditional UPDATE, re-load of the document with its owner at every stage, statuses queued -> extracting -> embedding -> indexing -> ready / failed / deleting with progress, one retry for infrastructure errors, partial index removed on failure, deletion during processing finished by the runner, interrupted jobs requeued at startup. Measured on the real stack (live run): AOP lecture 1 PDF -> ready (35 pages, 53 chunks), `SPE_l1.pptx` -> ready in 2.2 s (86 slides, 68 chunks), BGE + Chroma loaded lazily.
 - `ai/` change: `OCRProcessor` has an opt-in per-call Tesseract timeout (default off; 800-test `ai/` suite unchanged).
 - Tests: 39 M2 gate tests (`backend/tests/test_g2_*.py`, all generated fixtures incl. ZIP bomb, overlapping-entry ZIP, encrypted PDF/OOXML, macro DOCX, 900-megapixel PNG, hanging / memory-hungry / env-probing children); static rule against bidi control characters in sources (finding F-M2-08); 195 backend tests in total. New dependency python-multipart 0.0.34.
-- **For M3 (finding F-M2-10):** vectors exist before a document is `ready`, so every retrieval must pass `document_uids` = the course's `ready` documents (RET-03, RET-05).
+- **Release blocker F-M2-10 (declared 2026-11-24):** vectors exist before a document is `ready`. Enforced by `backend/app/services/retrieval.py` (the only path to `RetrievalService`; exact `status == ready` allowlist, `document_uids` on every query, post-search re-check, no store query for an empty scope); tests G3-RDY-01..07 pass and fail under a mutation check.
 
 ---
 
@@ -441,7 +441,7 @@ Platform
 15. Stronger-model run (2026-11-23): DeepSeek flash through the unchanged stack on the pinned retrieval cache, live policy A plus offline B1 / C replays, scored, root-caused and checksummed; evaluation milestone closed (section 11.2, `real_model_eval_report.md` section 11). Move to Linux with a pinned Python 3.12 environment the same day.
 
 ### In progress
-- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Security reference: [`backend_security_contract.md`](backend_security_contract.md) (authoritative for all backend work; rule ids cited in code and tests). Milestones: **M0 foundations + security baseline - done 2026-11-24 (3.12)**; **M1 identity, courses, ownership - done 2026-11-24 (3.13; gate: 79 items, CI green)**; **M2 documents + processing - done 2026-11-24 (3.14; gate [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md) M2: 39 items passing locally, CI on push)**; M3 next; M2 documents + processing; M3 grounded chat; M4 summaries + quiz generation; M5 quiz taking, end-to-end demo, security verification. Quiz MVP (decided 2026-11-24): multiple choice + true/false, retry incorrect answers, auto-grading, citations; no short-answer, essay or adaptive exams. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
+- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Security reference: [`backend_security_contract.md`](backend_security_contract.md) (authoritative for all backend work; rule ids cited in code and tests). Milestones: **M0 foundations + security baseline - done 2026-11-24 (3.12)**; **M1 identity, courses, ownership - done 2026-11-24 (3.13; gate: 79 items, CI green)**; **M2 documents + processing - done 2026-11-24 (3.14; gate [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md) M2: 39 items passing locally, CI on push)**; **M3 grounded chat - next; release gate [`M3_RELEASE_GATE.md`](M3_RELEASE_GATE.md) (52 items; M3 cannot be approved unless all pass). Release blocker F-M2-10 (READY-only retrieval): scoped retrieval layer built and gate section 2.1 passing (G3-RDY-01..07)**; M2 documents + processing; M3 grounded chat; M4 summaries + quiz generation; M5 quiz taking, end-to-end demo, security verification. Quiz MVP (decided 2026-11-24): multiple choice + true/false, retry incorrect answers, auto-grading, citations; no short-answer, essay or adaptive exams. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
 - Housekeeping: keep this file current; push branch `post-eval-quality`; archive `evaluation/results/` outside the machine (git-ignored, checksummed).
 - Table retrieval quality and table spacer columns (known issues).
 
@@ -656,6 +656,7 @@ Detail: section 6 (corpus composition and coverage assessment), section 7 (table
 
 ## 13. Changelog of this file
 
+- **2026-11-24 M3 release gate and release blocker F-M2-10**: `docs/M3_RELEASE_GATE.md` (52 items in 8 areas: READY-only retrieval, cross-user retrieval isolation, citation presence, citation ownership, prompt injection, chat states, DeepSeek failure handling, retrieval scope); scoped retrieval layer `backend/app/services/retrieval.py` with tests G3-RDY-01..07; contract v1.2.
 - **2026-11-24 M2 implemented**: new §3.14 (upload, storage, sandboxed parsing, jobs; 39 gate tests; findings F-M2-01..14); §3.13 records the green M1 CI run; §8 milestone line; contract v1.1 (UPL-06, UPL-08, UPL-12, Appendix D); M2 section in `SECURITY_MERGE_GATE.md`.
 - **2026-11-24 M1 implemented**: new §3.13 (endpoints, password, token, refresh, lockout and ownership design; 80 gate tests); §3.12 records the green M0 CI run; §8 milestone line. Gate evidence table added to `SECURITY_MERGE_GATE.md`; `backend/README.md` endpoint table.
 - **2026-11-24 M1 security merge gate**: `docs/SECURITY_MERGE_GATE.md` added and linked from §8; M0 CI confirmed green on GitHub (run 1, commit `7892321`: secret scan, dependency audit, lint, types, tests).

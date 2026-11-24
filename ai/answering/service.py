@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Mapping, Sequence
+from typing import Protocol
 
 from ai.answering import citations as citation_tools
 from ai.answering.context import ContextBuilder
@@ -35,7 +36,16 @@ from ai.answering.models import (
 from ai.answering.prompt import PROMPT_VERSION, build_messages
 from ai.answering.refusal import RefusalPolicy, message, pre_check
 from ai.chunking.interfaces import FilterValue
-from ai.retrieval import RetrievalService
+from ai.retrieval.models import RetrievalResult
+
+
+class Retriever(Protocol):
+    """What the answer service needs from retrieval: ``RetrievalService`` or any scoped view of it (e.g. the backend's
+    ready-only ``BoundRetrieval``)."""
+
+    def search(self, query: str, *, user_id: str, course_id: str, k: int = 5,
+               document_uids: Sequence[str] | None = None,
+               filters: Mapping[str, FilterValue] | None = None) -> RetrievalResult: ...
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +53,7 @@ logger = logging.getLogger(__name__)
 class AnswerService:
     def __init__(
         self,
-        retrieval: RetrievalService,
+        retrieval: Retriever,
         llm: LLMClient,
         *,
         context_builder: ContextBuilder | None = None,
