@@ -12,7 +12,7 @@ RET-06, ...) are cited in code and tests.
 | M1 | Identity, courses, ownership: register/login/refresh/logout/logout-all/me/change-password, Argon2id, HS256 access tokens, rotating refresh tokens with reuse detection, lockout, rate limits, course CRUD through `get_owned`; release gate `docs/SECURITY_MERGE_GATE.md` (79 items, all passing) | done (CI green) |
 | M2 | Documents and processing: streaming upload, file validation, ZIP-bomb and encryption checks, ownership-safe storage, sandboxed parser process, job runner; gate M2 section (39 items) | done (CI green) |
 | M3 | Grounded chat: conversations, messages, READY-only scoped retrieval, citation validation, answer sanitising, chat states, provider failure handling, token budget; release gate `docs/M3_RELEASE_GATE.md` (52 items, all passing; F-M2-10 closed) | done (CI green) |
-| M4 | Summaries + quiz generation | next (release gate to be written first) |
+| M4 | Summaries + quiz generation; release gate `docs/M4_RELEASE_GATE.md` (67 items) | next (gate written, not implemented) |
 | M5 | Quiz taking, end-to-end demo, security verification | planned |
 
 ## Run locally (demo profile)

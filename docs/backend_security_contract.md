@@ -1,7 +1,7 @@
 # IntelliStudy Backend Security Contract
 
 **Status:** authoritative security reference for the backend (`backend/`) and for every backend call into `ai/`.
-**Version:** 1.4, 2026-11-24 (release blocker F-M2-10 closed: M3 gate green in CI; v1.3: M3 findings F-M3-01..04 in Appendix D; v1.2: F-M2-10 declared a release blocker, RET-05 marked; v1.1: M2 findings, UPL-06/08/12, Appendix D). Applies to M0-M5 and to every later change.
+**Version:** 1.5, 2026-11-24 (M4 decisions: ISO-03 summary/quiz deletion and invalidation, ISO-04 key storage, UPL-16 usage ledger, finding F-M3-05; v1.4: release blocker F-M2-10 closed, M3 gate green in CI; v1.3: M3 findings F-M3-01..04 in Appendix D; v1.2: F-M2-10 declared a release blocker, RET-05 marked; v1.1: M2 findings, UPL-06/08/12, Appendix D). Applies to M0-M5 and to every later change.
 **Scope:** API, database, job runner, file storage, vector store (Chroma), parent store, retrieval, LLM providers,
 summaries, quizzes, conversations. Frontend rules appear only where the backend depends on them.
 
@@ -93,8 +93,8 @@ include in a prompt any data owned by user B.
 |---|---|
 | ISO-01 | Every query for summaries, questions, quizzes, attempts, conversations and messages MUST join to an owned course or document (or filter by `owner_id`) in the same statement. |
 | ISO-02 | Database access MUST use the SQLAlchemy ORM or Core with bound parameters. String-built SQL with user input MUST NOT exist. |
-| ISO-03 | Deleting a course MUST delete, in this order: mark course and its documents `deleting` (no longer retrievable) -> vectors and parents of each document -> stored files -> summaries, questions, quizzes, attempts, conversations, messages, jobs -> the course row. Deleting a document MUST follow the same order for its own data and delete bank questions that depend only on it. A failure part-way MUST leave the resource in `deleting` (never retrievable) and be retried. |
-| ISO-04 | Quiz content returned before an attempt is submitted MUST NOT contain the correct option, option rationales or grading keys. These MUST only appear in results of a submitted attempt owned by the requester. |
+| ISO-03 | Deleting a course MUST delete, in this order: mark course and its documents `deleting` (no longer retrievable) -> vectors and parents of each document -> stored files -> summaries, questions, quizzes, attempts, conversations, messages, jobs -> the course row. Deleting a document MUST follow the same order for its own data: its summaries MUST be deleted; quizzes whose source documents are only that document MUST be deleted (questions, answer keys, sources); a quiz with several source documents MUST be marked `invalid` (`source_deleted`), its questions and answer keys deleted, and it MUST be regenerated before use (team decision 2026-11-24, M4 gate T-1..T-3); bank questions that depend only on the document MUST be deleted. A failure part-way MUST leave the resource in `deleting` (never retrievable) and be retried. |
+| ISO-04 | Quiz content returned before an attempt is submitted MUST NOT contain the correct option, option rationales or grading keys. These MUST only appear in results of a submitted attempt owned by the requester. The answer key (correct answer, rationales, evidence) MUST be stored separately from the public question data, so a serializer of questions cannot reach it. |
 | ISO-05 | A question bank is per course. Questions MUST NOT be shared or deduplicated across users or courses. |
 | ISO-06 | Any cache (summary cache, embedding cache, rate-limit state, provider response cache) MUST include the user id in its key or hold no user content. Cross-user caching of document-derived content is forbidden. |
 | ISO-07 | A single LLM call MUST contain content from exactly one user and one course. Batching prompts across users is forbidden. |
@@ -241,7 +241,7 @@ string extracted from them (which later reaches LLM prompts).
 | UPL-13 | Failures MUST map to a fixed set of user-facing reasons (unsupported type, too large, too many pages, password-protected, corrupted, could not be read, timed out). Library error messages, stack traces and paths MUST NOT reach the client. |
 | UPL-14 | Extracted text MUST be treated as untrusted when it enters prompts: it is fenced (`prompt.py`), cannot impersonate citation tags, and model output derived from it is validated (citations/grounding for chat and summaries, schema + support check for quizzes). The model MUST have no tools, no network access and no secrets in its prompt (OWASP LLM01/LLM06). |
 | UPL-15 | Model output (answers, summaries, quiz text) MUST be returned as data, never executed, and documented as untrusted for rendering: the frontend MUST render it as escaped text or sanitised Markdown (no raw HTML). |
-| UPL-16 | Rate limits (section 9a) MUST apply to upload and to every LLM-consuming endpoint, plus a per-user daily LLM token budget (OWASP LLM10). |
+| UPL-16 | Rate limits (section 9a) MUST apply to upload and to every LLM-consuming endpoint, plus a per-user daily LLM token budget (OWASP LLM10). The budget MUST be one ledger shared by chat, summaries and quizzes, with one entry per provider call (user, feature, tokens, time; no content), and MUST NOT be reduced when conversations, summaries, quizzes, documents or courses are deleted (finding F-M3-05). Generation that needs several model calls MUST check the budget before each call. |
 
 ### 9a. Rate limits and quotas (defaults; configurable)
 
@@ -295,9 +295,9 @@ security event logged (OWN-05), and A's resource unchanged.
 | I-07 | `GET /documents/{A_doc}/file` | FILE-05 | M2 |
 | I-08 | `DELETE /documents/{A_doc}`, `POST /documents/{A_doc}/retry` | OWN-03 | M2 |
 | I-09 | `POST /courses/{B_course}/...` naming `A_doc` in a body or path | OWN-06, RET-04 | M2/M3 |
-| I-10 | `GET` / `POST /documents/{A_doc}/summary` | ISO-01 | M4 |
+| I-10 | `GET` / `POST /documents/{A_doc}/summary` | ISO-01 | M4 (G4-SIS) |
 | I-11 | `POST /courses/{A_course}/conversations`; `GET /conversations/{A_conv}`; `POST /conversations/{A_conv}/messages` | ISO-01 | M3 |
-| I-12 | `POST /courses/{A_course}/quizzes`; `GET /quizzes/{A_quiz}` | ISO-01 | M4 |
+| I-12 | `POST` / `GET /courses/{A_course}/quizzes`; `GET` / `DELETE /quizzes/{A_quiz}`; `POST /quizzes/{A_quiz}/regenerate` | ISO-01 | M4 (G4-QIS) |
 | I-13 | `POST /quizzes/{A_quiz}/attempts`; `PUT /attempts/{A_attempt}/answers/{q}`; `POST /attempts/{A_attempt}/submit`; `GET /attempts/{A_attempt}/results`; `POST /attempts/{A_attempt}/retry-missed` | ISO-01, ISO-04 | M5 |
 | I-14 | Random UUIDs and malformed ids on every `{id}` route return the same 404 as I-01..I-13 | OWN-04 | M1-M5 |
 | I-15 | Request bodies containing `owner_id` / `user_id` / `course_id` fields are rejected (422) | OWN-08 | M1 |
@@ -466,3 +466,4 @@ the merge gate. "Residual" means accepted for now and tracked.
 | F-M3-02 | A model that obeys an instruction planted in a document can emit a markdown image or `<img>` pointing at an attacker's server; a renderer that loads it leaks data with zero clicks. | Answer text is sanitised server-side before it is stored or returned (markdown images and `<img>` tags removed, `sanitize_answer_text` in `chat.py`); G3-PI-06 (exfil-image, exfil-html) fails when the sanitiser is removed. |
 | F-M3-03 | **Residual:** grounding cannot stop an obedient model from repeating a document's own text verbatim with a valid citation (for example "I am DAN ..."), because that text is genuinely supported by the source. | Harm is bounded to the uploader's own content in the uploader's own course (retrieval is scoped; no cross-user material reaches the prompt, G3-PI-05). The frontend MUST render answers as text, never as HTML (UPL-15). |
 | F-M3-04 | The OpenAI-compatible provider accepted an empty or blank `content` (for example a thinking-mode reply carrying only `reasoning_content`) as a valid answer, so it reached the answer pipeline instead of being treated as a provider failure. | Blank content raises a provider error, giving `refused` / `llm_unavailable`; `reasoning_content` is never read, stored or returned (G3-PRV-07). |
+| F-M3-05 | **Open (found 2026-11-24 while designing M4).** The M3 daily token budget is computed from stored messages, so deleting a conversation deletes its messages and refunds the tokens they used: a user can exceed the budget by deleting and asking again. Bounded by the chat rate limit (20 per minute) and relevant to cost only, not to isolation. | Fixed in M4 by the shared usage ledger (UPL-16); closes when G4-BUD-04 passes in CI. |
