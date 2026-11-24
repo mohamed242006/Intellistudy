@@ -1,0 +1,19 @@
+# Local hooks: install once with `pip install pre-commit && pre-commit install`.
+# gitleaks blocks commits that contain secrets (contract SEC-03); CI runs the same scan on the full history.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.1
+    hooks:
+      - id: ruff
+        args: [--fix]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+      - id: detect-private-key
+      - id: forbid-new-submodules

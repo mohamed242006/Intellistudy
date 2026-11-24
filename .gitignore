@@ -23,6 +23,10 @@ node_modules/
 # Local data
 data/chroma/
 *.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+# backend runtime data: database, vector index, uploaded user documents (never commit)
+data/backend/
 
 # evaluation artefacts
 evaluation/.index/

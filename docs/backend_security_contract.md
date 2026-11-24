@@ -410,9 +410,25 @@ recorded contract change.
 
 | Item | Needed by |
 |---|---|
-| CORS origins for the local demo and the cloud frontend | M0 |
+| CORS origins for the cloud frontend (demo origins decided 2026-11-24, below) | before cloud deployment |
 | Exact rate-limit and daily token-budget numbers (defaults in 9a) | M1-M4 |
 | JWT key management in the cloud (secret manager; rotation cadence) | before cloud deployment |
 | Chat-state thresholds for `partial` / `low_confidence` (not a security rule, but they decide which warnings users see) | M3 |
-| Whether short-answer questions (LLM-graded) are in the MVP; if yes, grading prompts need the UPL-14 treatment | M4 |
 | Privacy notice and consent for sending document content to the external LLM provider (DeepSeek) | before any non-team user uploads |
+
+Decided 2026-11-24: CORS origins `http://localhost:3000`, `http://localhost:5173`, `http://127.0.0.1:5173` (demo
+defaults in `backend/app/core/config.py`); JWT secret at least 32 random bytes, environment only; quiz MVP = multiple
+choice + true/false, retry incorrect answers, auto-grading, citations; no short-answer, essay or adaptive exams.
+
+## Appendix C. Recorded dependency exceptions (SEC-11)
+
+`pip-audit` runs on `requirements.lock.txt` in CI. A finding may only be ignored if it is listed here with its reason
+and an expiry condition; CI ignores exactly these ids (`.github/workflows/backend.yml`).
+
+| Package / version | Advisory ids | Why it does not apply now | Expires when |
+|---|---|---|---|
+| chromadb 1.5.9 | PYSEC-2026-311, PYSEC-2026-3813, PYSEC-2026-3814, PYSEC-2026-3815 | All four affect the **Chroma server** (pre-auth code injection through a model repository with `trust_remote_code`, and authorization / tenant checks of the server's auth providers). IntelliStudy uses the **embedded** `PersistentClient` inside the API process: no Chroma HTTP server, no Chroma auth provider, no Chroma embedding functions (embeddings come from BGE via sentence-transformers with `trust_remote_code=False`), and the store files are not network-reachable (VEC-08). No fixed version exists (audit of 2026-11-24). | A fixed chromadb release exists (upgrade), **or** any plan to run Chroma in server mode (cloud) - that plan is blocked until these are fixed or mitigated. |
+| torch 2.15.0+cpu | (not auditable) | The CPU wheel comes from the PyTorch index, which `pip-audit` cannot query. Track PyTorch security advisories manually at each upgrade. | Every torch upgrade. |
+
+Resolved by upgrade on 2026-11-24 (M0): Pillow 12.3.0 -> 13.0.0 (42 advisories, several in image decoders reachable
+from images embedded in uploaded documents); setuptools 78.1.0 -> 84.2.1 (5 advisories, build tooling).

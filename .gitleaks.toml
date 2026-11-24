@@ -1,0 +1,11 @@
+# gitleaks configuration: the default rules, plus allowlisted placeholders that are documentation, not secrets.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented placeholders (see .env.example and docs/backend_security_contract.md)"
+regexes = [
+  '''replace-with-output-of-secrets\.token_urlsafe-32''',
+  '''your-api-key-here''',
+  '''sk-your-key-here''',
+]

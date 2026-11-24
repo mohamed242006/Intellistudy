@@ -1,0 +1,66 @@
+# Backend CI: secret scanning, dependency audit, lint, types and tests on every push and pull request.
+# Security reference: docs/backend_security_contract.md (SEC-03 secret scanning, SEC-11 dependency audit).
+name: backend
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # scan the whole history
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  audit:
+    name: dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pip-audit
+      # Ignored ids are recorded exceptions with reasons: docs/backend_security_contract.md, Appendix C.
+      - run: >-
+          pip-audit -r requirements.lock.txt --no-deps --disable-pip
+          --ignore-vuln PYSEC-2026-311
+          --ignore-vuln PYSEC-2026-3813
+          --ignore-vuln PYSEC-2026-3814
+          --ignore-vuln PYSEC-2026-3815
+
+  test:
+    name: lint, types, tests
+    runs-on: ubuntu-latest
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      INTELLISTUDY_SKIP_SLOW: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: system packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr
+      - name: install the locked environment
+        run: >-
+          python -m pip install uv &&
+          uv pip install --system -r requirements.lock.txt
+          --index-url https://pypi.org/simple
+          --extra-index-url https://download.pytorch.org/whl/cpu
+          --index-strategy unsafe-best-match
+      - run: python -m ruff check ai backend tests evaluation
+      - run: python -m mypy ai backend
+      - name: backend tests
+        run: python -m unittest discover -s backend/tests -t .
+      - name: ai tests
+        run: python -m unittest discover -s tests -t .

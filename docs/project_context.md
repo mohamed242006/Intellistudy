@@ -47,7 +47,7 @@ Market analysis (ChatGPT, NotebookLM, Quizlet AI, Khanmigo, Studocu AI, CourseHe
 baseline features; grounded citations plus adaptive learning are the differentiators.
 
 ### Tech stack
-Frontend React + Tailwind (not started; `figma_ui_context.md` recommends React + TypeScript) · Backend Python/FastAPI (skeleton only) · AI: sentence-transformers, ChromaDB, RAG ·
+Frontend React + Tailwind (not started; `figma_ui_context.md` recommends React + TypeScript) · Backend Python/FastAPI (M0 foundation done 2026-11-24; product endpoints M1-M5) · AI: sentence-transformers, ChromaDB, RAG ·
 DB: PostgreSQL planned (SQLite used now for parent chunks) · Documents: PyMuPDF, python-docx, python-pptx, pdfplumber, Pillow,
 Tesseract/pytesseract · Optional speech: Whisper · Deployment: Docker/Compose (not started) · VCS/CI: Git/GitHub Actions (CI not started).
 
@@ -187,6 +187,17 @@ Details, guarantees and results: [`answer_layer.md`](answer_layer.md) (MVP recor
 ### 3.11 FigureDescriber plug-in point (`ai/ingestion/figure_description.py`) - DONE (no vision model included)
 `FigureDescriber` / `FigureCropper` protocols, `PdfFigureCropper`, `enrich_figures` (never overwrites source text; rejects descriptions whose numbers are not in the author's text; caches by image hash + model + prompt version; one failing figure never stops the rest), `NullFigureDescriber`, `StubFigureDescriber`. The chunker renders a described figure with a labelled generated-description line, and because ids depend on text only, enrichment renames only the figure chunks. A real describer (Qwen2.5-VL or other) is adopted only if it clearly beats the Phase 0 baseline on the figure benchmark and on real figure-heavy documents. PPTX/DOCX croppers do not exist yet.
 
+### 3.12 Backend foundation, M0 (`backend/`) - DONE 2026-11-24
+Vertical-slice milestone M0 of the Backend Vertical Slice; security rules from [`backend_security_contract.md`](backend_security_contract.md). Details and run instructions: `backend/README.md`.
+- `create_app()` factory (no module-level app); pydantic-settings from `INTELLISTUDY_*` environment variables only, secrets as `SecretStr`; `demo`/`prod` refuse to start without a JWT secret of at least 32 bytes (placeholders and low-variety values rejected), `prod` also without the selected provider's key; approved CORS allowlist (`localhost:3000`, `localhost:5173`, `127.0.0.1:5173`), wildcards rejected.
+- Pure-ASGI middleware: request ids, security headers (`nosniff`, `no-referrer`, `DENY`, CSP, `Cache-Control: no-store` on the API), body-size limit that also catches chunked bodies, and an innermost unhandled-error middleware so a 500 keeps CORS, security headers and the request id (a Starlette catch-all handler would have dropped them; found by the M0 tests). Errors are RFC 7807 problem documents without traces; validation errors never echo submitted values; unknown routes return the standard 404 (OWN-04 shape).
+- JSON logging with secret redaction (known values plus credential shapes) and a security event log; in-memory sliding-window rate limiter with the contract's default limits (attached to routes from M1).
+- SQLAlchemy 2 + Alembic (baseline revision; `python -m backend.app.db.migrate`): portable UUID-string ids, UTC-aware datetimes, naming convention; SQLite with WAL, foreign keys and busy timeout. PostgreSQL needs only `INTELLISTUDY_DATABASE_URL`.
+- LLM providers behind one interface that also satisfies `ai.answering.llm.LLMClient`: `DeepSeekProvider` (default `deepseek-chat`, the validated configuration; other DeepSeek models get `thinking: disabled`), `OpenAIProvider` (`max_completion_tokens` and no `temperature` for reasoning models), `LocalProvider` (= `FutureLocalProvider`; Ollama/vLLM); no redirects followed, retries with jitter on 408/409/429/5xx, provider error bodies redacted in logs and never returned.
+- `AIContainer`: lazy embedder, reranker, Chroma store, parent store and retrieval service; the only backend module allowed to touch the stores (static test). `GET /api/v1/health` reports booleans and names only.
+- Tests: 74 in `backend/tests` (config and secrets, HTTP hardening, provider contracts, redaction, rate limits, database, static architecture rules for VEC-03/VEC-04/OWN-03/SEC-02). CI workflow `.github/workflows/backend.yml` (gitleaks on full history, pip-audit with recorded exceptions, ruff, mypy, both test suites) and `.pre-commit-config.yaml` + `.gitleaks.toml` added; CI has not run on GitHub yet (branch not pushed).
+- Dependency audit (2026-11-24): Pillow 12.3.0 -> 13.0.0 (42 advisories, several in decoders reachable from images inside uploads) and setuptools -> 84.2.1; the 800-test `ai/` suite passes on Pillow 13. chromadb 1.5.9 has 4 server-mode advisories with no fix; recorded as an exception (contract Appendix C) because the embedded client is used; running Chroma as a server is blocked until they are fixed.
+
 ---
 
 ## 4. Current Folder Structure
@@ -204,9 +215,13 @@ Intellistudy/
 │   ├── storage/       sqlite_parent_store.py (SQLiteParentStore)
 │   ├── retrieval/     models, service (RetrievalService), references, rerank, assessment, calibration
 │   └── answering/     models, llm, context, prompt, citations, grounding, refusal, service (AnswerService)
-├── backend/
-│   ├── app/           main.py only (FastAPI skeleton, GET / only)
-│   └── requirements.txt   fastapi, uvicorn, pymupdf, python-docx, python-pptx, pdfplumber, pillow, pytesseract, chromadb, sentence-transformers (unpinned)
+├── backend/           (M0, 3.12; see backend/README.md)
+│   ├── app/           main.py (create_app), core/ (config, logging, errors, middleware, ratelimit), db/ (base,
+│   │                  session, models, migrate), providers/ (DeepSeek, OpenAI, Local), services/ai_container.py,
+│   │                  api/v1/ (health)
+│   ├── migrations/    Alembic env + versions (0001_baseline); alembic.ini
+│   ├── tests/         74 unittest tests incl. static architecture rules
+│   └── requirements.txt   direct dependencies (ranges); exact pins in requirements.lock.txt
 ├── (frontend/)        does not exist yet
 ├── evaluation/        retrieval_dataset, index_builder, retrieval_eval, answer_eval, answer_gold, answer_metrics,
 │                      real_model_eval, policy_replay, root_cause, handlabel/ (judge-validation template),
@@ -230,7 +245,7 @@ Intellistudy/
 Environment (since 2026-11-23): Linux x86_64; project virtual environment `.venv` (git-ignored) with Python 3.12.16 (uv-managed;
 the system Python is 3.14 and is not used); CPU PyTorch 2.15.0 (deliberately CPU, so NLI scoring stays comparable with the CPU-measured
 Qwen numbers), transformers 5.24.0, sentence-transformers 6.0.0, chromadb 1.5.9, PyMuPDF 1.28.2, python-docx 1.2.0, python-pptx 1.0.2,
-pdfplumber 0.11.10, Pillow 12.3.0, pytesseract 0.3.13 + Tesseract (`/usr/bin/tesseract`), ruff 0.17.1, mypy 2.4.0, coverage 7.16.2,
+pdfplumber 0.11.10, Pillow 13.0.0 (12.3.0 until 2026-11-24, upgraded for security advisories), SQLAlchemy 2.1.9, Alembic 1.20.1, pytesseract 0.3.13 + Tesseract (`/usr/bin/tesseract`), ruff 0.17.1, mypy 2.4.0, coverage 7.16.2,
 vulture 2.16; exact pins in `requirements.lock.txt` (recreate command in its header). pytest is not installed (tests use unittest).
 Hugging Face models (BGE-small, MiniLM reranker, NLI judge) download on first use. *Superseded:* Windows 11 + Python 3.12 in a
 OneDrive folder (until 2026-11-15).
@@ -377,9 +392,9 @@ Platform
 - **Storage quota and delete cascade not implemented**: the 1 GB per-user quota and cascading document deletion are policy only (see Storage and Retention Policy).
 - **Upload limits missing**: no file-size, page/slide-count, image-count, zip-bomb guard or Tesseract timeout.
 - **PostgreSQL persistence missing**: users, courses, documents and parent chunks live in SQLite/Chroma files only.
-- **CI/CD missing**: no GitHub Actions, no Dockerfile (docker-compose.yml is empty), Tesseract not in any image. `backend/requirements.txt` is unpinned; the working environment is pinned in `requirements.lock.txt` (2026-11-23, uncommitted).
-- Backend is a skeleton (`GET /` only): no upload API, auth or job queue. Chroma is single-process.
-- **Version control**: commits `1660115` and `1a38fad` hold the work up to 2026-11-15; `requirements.lock.txt` and the 2026-11-23 doc edits are uncommitted. `evaluation/results/` is git-ignored, so evaluation outputs (the Qwen runs, the retrieval cache, the DeepSeek runs) are local only; after the move to Linux they were missing until restored by hand from the old machine, which shows the risk. *Decision (open)*: whether to version them (or archive them elsewhere). *Superseded:* the OneDrive location of the Windows machine.
+- **CI/CD partly in place**: GitHub Actions workflow added in M0 (secret scan, dependency audit, lint, types, tests), not yet run on GitHub; no Dockerfile (docker-compose.yml is empty), Tesseract not in any image. Exact pins in `requirements.lock.txt`.
+- Backend has its foundation (M0, 3.12) but no product endpoints yet: auth, courses, upload, jobs, chat, summaries and quizzes arrive in M1-M5. Chroma is single-process (embedded).
+- **Version control**: work up to 2026-11-15 is in `1660115` and `1a38fad`; post-evaluation work, the security contract and M0 are on branch `post-eval-quality` (not pushed). `evaluation/results/` is git-ignored, so evaluation outputs (the Qwen runs, the retrieval cache, the DeepSeek runs) are local only; after the move to Linux they were missing until restored by hand from the old machine, which shows the risk. *Decision (open)*: whether to version them (or archive them elsewhere). *Superseded:* the OneDrive location of the Windows machine.
 
 ---
 
@@ -403,7 +418,7 @@ Platform
 15. Stronger-model run (2026-11-23): DeepSeek flash through the unchanged stack on the pinned retrieval cache, live policy A plus offline B1 / C replays, scored, root-caused and checksummed; evaluation milestone closed (section 11.2, `real_model_eval_report.md` section 11). Move to Linux with a pinned Python 3.12 environment the same day.
 
 ### In progress
-- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Security reference: [`backend_security_contract.md`](backend_security_contract.md) (authoritative for all backend work; rule ids cited in code and tests). The milestone plan (M0-M5) is not yet written down in this file. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
+- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Security reference: [`backend_security_contract.md`](backend_security_contract.md) (authoritative for all backend work; rule ids cited in code and tests). Milestones: **M0 foundations + security baseline - done 2026-11-24 (3.12)**; M1 identity, courses, ownership (next); M2 documents + processing; M3 grounded chat; M4 summaries + quiz generation; M5 quiz taking, end-to-end demo, security verification. Quiz MVP (decided 2026-11-24): multiple choice + true/false, retry incorrect answers, auto-grading, citations; no short-answer, essay or adaptive exams. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
 - Housekeeping: keep this file current; push branch `post-eval-quality`; archive `evaluation/results/` outside the machine (git-ignored, checksummed).
 - Table retrieval quality and table spacer columns (known issues).
 
@@ -618,6 +633,7 @@ Detail: section 6 (corpus composition and coverage assessment), section 7 (table
 
 ## 13. Changelog of this file
 
+- **2026-11-24 M0 backend foundation**: new §3.12; §4 backend tree and environment versions (Pillow 13, SQLAlchemy, Alembic); §7 platform bullets (CI partly in place, backend foundation, version control); §8 milestone list and the approved quiz-MVP scope; tech-stack line updated. Contract: Appendix C (recorded dependency exceptions) and decided items (CORS, JWT, quiz scope).
 - **2026-11-24 backend security contract**: `docs/backend_security_contract.md` added (ownership, isolation, retrieval, vector-store and file-storage guarantees, JWT and refresh-token model, secrets, upload rules, security test matrix); §8 "In progress" and the related-documents list link it.
 - **2026-11-24 priorities and future-work register** (docs only): Backend Vertical Slice recorded as the active priority in §8 "In progress"; items 16-18 marked parked (FW-1, FW-2) without reordering §8; new §12 "Future Work (High Priority Before Production Deployment)" with FW-1 to FW-5; §10 points to it; changelog renumbered 12 -> 13; header updated.
 

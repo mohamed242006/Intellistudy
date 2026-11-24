@@ -1,5 +1,17 @@
+# Direct dependencies (names and compatible ranges). Exact, reproducible pins: requirements.lock.txt at the repo root.
+# Install the lock, not this file:  uv pip install -r requirements.lock.txt  (see its header)
+
+# API
 fastapi
 uvicorn
+pydantic-settings>=2.4
+httpx>=0.27            # LLM provider client; also used by the test client
+
+# Database (SQLite for the demo; PostgreSQL later with the same code)
+sqlalchemy>=2.0,<3
+alembic>=1.13,<2
+
+# Document ingestion and AI (ai/)
 pymupdf
 pdfplumber
 pillow
