@@ -1,7 +1,7 @@
 # IntelliStudy Backend Security Contract
 
 **Status:** authoritative security reference for the backend (`backend/`) and for every backend call into `ai/`.
-**Version:** 1.0, 2026-11-24. Written before M0; applies to M0-M5 and to every later change.
+**Version:** 1.1, 2026-11-24 (M2 findings: UPL-06, UPL-08, UPL-12 updated; Appendix D). Applies to M0-M5 and to every later change.
 **Scope:** API, database, job runner, file storage, vector store (Chroma), parent store, retrieval, LLM providers,
 summaries, quizzes, conversations. Frontend rules appear only where the backend depends on them.
 
@@ -231,13 +231,13 @@ string extracted from them (which later reaches LLM prompts).
 | UPL-03 | At most 10 files per request (FR-UPL-02); per-user storage quota 1 GB (storage policy), checked before accepting each file. |
 | UPL-04 | The type MUST be determined from content, not from the extension or `Content-Type`: PDF starts with `%PDF-`; DOCX/PPTX are ZIP containers whose `[Content_Types].xml` declares the WordprocessingML / PresentationML main part and contain `word/document.xml` / `ppt/presentation.xml`. Extension and detected type MUST agree, otherwise reject. |
 | UPL-05 | ZIP containers MUST be inspected before parsing: reject if total uncompressed size > 500 MB, any entry's compression ratio > 100, entry count > 10,000, any entry name is absolute or contains `..`, or the archive contains `vbaProject.bin` (macros). |
-| UPL-06 | Encrypted or password-protected PDFs and Office files MUST be rejected with a clear reason ("password-protected"). |
+| UPL-06 | Password-protected PDFs (a user password is needed to open them) and encrypted Office files (OLE containers with an `EncryptedPackage` stream, or ZIP entries with the encryption flag) MUST be rejected with the reason "password-protected". A PDF encrypted only with an owner password (permissions, opens without a password) is readable and MAY be accepted (finding F-M2-02). |
 | UPL-07 | Page / slide limit: 300 per file (configurable `MAX_PAGES`), checked as early as possible (PDF page count before full parsing; slide count from the presentation part) and enforced again during parsing. |
-| UPL-08 | Image decoding MUST set an explicit Pillow pixel limit (`Image.MAX_IMAGE_PIXELS`, default 89,478,485) and treat `DecompressionBombError` as a skipped image, not a crash. OCR MUST have a per-image timeout (30 s) and a per-document OCR budget. |
+| UPL-08 | Image decoding MUST set an explicit Pillow pixel limit (`Image.MAX_IMAGE_PIXELS`, default 89,478,485), turn `DecompressionBombWarning` into an error, and treat a bomb as a skipped image, not a crash. OCR MUST have a per-image timeout (30 s). A separate per-document OCR budget is not implemented; total OCR time is bounded by the per-document wall-clock limit of UPL-12 (finding F-M2-12). |
 | UPL-09 | Embedded objects (OLE, ActiveX, macros, scripts, external links, embedded fonts) MUST NOT be executed, rendered by external programs or followed. Equation-object decoding (FW-1, parked) MUST be a bounded pure-data parser when it is added. |
 | UPL-10 | The display file name MUST follow FILE-08; storage follows FILE-01..06. |
 | UPL-11 | Same-user, same-course duplicates (same SHA-256) MAY return the existing document (FR-UPL-04); cross-user dedup is forbidden (ISO-08). |
-| UPL-12 | Parsing (ingestion: PDF/DOCX/PPTX readers, OCR, table extraction) MUST run in a separate child process, never in the API process (NFR-SEC-05), with: address-space limit (default 2 GiB, `RLIMIT_AS`), CPU-time limit, a wall-clock timeout per document (default 10 min), no inherited secrets (FILE-09), and the process killed on timeout. The parent MUST treat the child's output as untrusted data (schema-validated, size-bounded). |
+| UPL-12 | Parsing (ingestion: PDF/DOCX/PPTX readers, OCR, table extraction) MUST run in a separate child process, never in the API process (NFR-SEC-05), with: a **resident-memory** limit (default 2 GiB, child plus descendants) enforced by a parent watchdog that kills the process group; `RLIMIT_AS` only as a coarse ceiling (default 8 GiB), because the parser stack reserves far more address space than it uses (finding F-M2-01); a CPU-time limit; a wall-clock timeout per document (default 10 min); no inherited secrets (FILE-09); and the process group killed on any breach. The child MUST return JSON only (never pickle), and the parent MUST treat it as untrusted data: size-bounded, exact field set, and every chunk carrying the expected `user_id`, `course_id` and `document_uid`. |
 | UPL-13 | Failures MUST map to a fixed set of user-facing reasons (unsupported type, too large, too many pages, password-protected, corrupted, could not be read, timed out). Library error messages, stack traces and paths MUST NOT reach the client. |
 | UPL-14 | Extracted text MUST be treated as untrusted when it enters prompts: it is fenced (`prompt.py`), cannot impersonate citation tags, and model output derived from it is validated (citations/grounding for chat and summaries, schema + support check for quizzes). The model MUST have no tools, no network access and no secrets in its prompt (OWASP LLM01/LLM06). |
 | UPL-15 | Model output (answers, summaries, quiz text) MUST be returned as data, never executed, and documented as untrusted for rendering: the frontend MUST render it as escaped text or sanitised Markdown (no raw HTML). |
@@ -432,3 +432,28 @@ and an expiry condition; CI ignores exactly these ids (`.github/workflows/backen
 
 Resolved by upgrade on 2026-11-24 (M0): Pillow 12.3.0 -> 13.0.0 (42 advisories, several in image decoders reachable
 from images embedded in uploaded documents); setuptools 78.1.0 -> 84.2.1 (5 advisories, build tooling).
+
+
+## Appendix D. Implementation findings
+
+Security-relevant findings discovered while implementing the backend, with what was done. Ids are cited in code and in
+the merge gate. "Residual" means accepted for now and tracked.
+
+### M2 (documents and processing), 2026-11-24
+
+| Id | Finding | Resolution |
+|---|---|---|
+| F-M2-01 | The contract's 2 GiB `RLIMIT_AS` for the parser would kill legitimate parses: measured on real lecture files, the ingestion + tokenizer stack peaks at **3.8 GiB virtual** address space while using only **843 MiB resident** (thread stacks, numpy and tokenizer reservations). | UPL-12 changed: a parent watchdog enforces a 2 GiB **resident** limit over the child and its descendants and kills the process group; `RLIMIT_AS` stays as an 8 GiB ceiling. Tested with a memory-hungry probe child (G2-UPL-08). |
+| F-M2-02 | PDFs encrypted with only an owner password (permission flags) open without a password. Rejecting all "encrypted" PDFs would reject many legitimate lecture files; their content is readable, so the encryption is no protection boundary. | Only PDFs that need a password (`needs_pass`) are rejected; owner-password-only PDFs are processed (UPL-06 clarified; G2-UPL-05). |
+| F-M2-03 | Tesseract was called without a timeout in `ai/ingestion`, so a crafted image could hold the parser for the whole document budget. | `OCRProcessor` gained an opt-in per-call timeout (default off, so existing `ai/` behaviour and its 800 tests are unchanged); the sandbox sets 30 s (UPL-08). |
+| F-M2-04 | FastAPI's `UploadFile` spools a whole multipart body to disk before the handler runs, so a per-file limit could only be checked after an attacker's 10 GB upload had landed. Also, the generic JSON body limit was exempted by **path prefix**; the natural prefix `/api/v1/courses/` would have exempted every course route. | Uploads are parsed incrementally with python-multipart's callback parser and aborted at the limit (G2-UPL-01); the body-limit exemption is now an exact method + full-path regex for the one upload route. |
+| F-M2-05 | Passing the parsed document back from the child with pickle would let a parser exploit inside the child execute code in the API process (unpickling is code execution). | The child returns JSON; the parent rebuilds chunks from an exact field set and checks their scope (UPL-12; G2-UPL-13, G2-ISO-10). |
+| F-M2-06 | A child process inherits the parent's whole environment by default, including the JWT secret and the LLM provider key. | Allowlisted environment; anything secret-looking dropped even if allowlisted (FILE-09; G2-UPL-11). |
+| F-M2-07 | Encrypted `.docx`/`.pptx` files are OLE2 containers, not ZIP files. A magic-bytes check alone would call them "wrong type", and a renamed legacy `.doc` looks the same. | OLE containers with an `.docx`/`.pptx` name are passed to the sandbox, which reports `password_protected` (an `EncryptedPackage` stream) or `unsupported_type` (legacy format). |
+| F-M2-08 | A literal U+202E (right-to-left override) character entered a test source file through an editing tool. Bidi control characters in source can make code read differently from how it runs ("Trojan Source"). | Replaced by an escape; a static test now fails on any bidi control character in `ai/`, `backend/`, `tests/`, `evaluation/`. |
+| F-M2-09 | Document authoring libraries (python-pptx via Pillow) refuse decompression-bomb images, but an attacker can swap the image inside the ZIP afterwards. | Defence is at decode time in the sandbox (UPL-08): the image is skipped and the rest of the document is still processed (G2-UPL-07). |
+| F-M2-10 | Vectors are written before a document is marked `ready`, so a retrieval that filtered only by user and course could see a document mid-indexing or one marked `deleting`. | No retrieval endpoint exists in M2. **M3 must pass `document_uids` = the course's `ready` documents on every query (RET-03, RET-05)**; failed documents have their partial index removed (G2-JOB-08). |
+| F-M2-11 | Deleting a course while a document of it is being processed removes the document row (FK cascade) while the runner still holds its ids. | The runner re-loads the document with its owner at every stage and, when the row is gone or marked `deleting`, purges vectors, parents and files by the ids it holds (G2-JOB-04, G2-ISO-09). |
+| F-M2-12 | **Residual:** no separate per-document OCR budget (UPL-08 as first written). | Total OCR time is bounded by the per-document wall clock (10 min) and the per-image timeout (30 s). |
+| F-M2-13 | **Residual:** rate limits key on the socket peer address; behind a reverse proxy every client would share the proxy's address. | Acceptable for the local demo; trusted-proxy handling (and a shared limiter store) are required before cloud deployment (contract 9a). |
+| F-M2-14 | **Residual:** DOCX files have no pages, so the page limit (UPL-07) applies only to PDF and PPTX. | DOCX is bounded by the 100 MB file limit, the ZIP limits, the memory watchdog and the wall-clock timeout. |

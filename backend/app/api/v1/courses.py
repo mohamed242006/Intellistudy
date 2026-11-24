@@ -8,12 +8,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query, Response, status
+from fastapi import APIRouter, Path, Query, Request, Response, status
 
 from backend.app.api.deps import CurrentUser, DbSession
 from backend.app.api.v1.schemas import CourseCreate, CourseList, CourseOut, CourseUpdate
 from backend.app.db.models import Course
 from backend.app.services import courses as course_service
+from backend.app.services.documents import DocumentService
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -55,6 +56,8 @@ def update_course(course_id: CourseId, body: CourseUpdate, user: CurrentUser, se
 
 
 @router.delete("/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_course(course_id: CourseId, user: CurrentUser, session: DbSession) -> Response:
-    course_service.delete_course(session, user, course_id)
+def delete_course(course_id: CourseId, request: Request, user: CurrentUser, session: DbSession) -> Response:
+    """ISO-03: documents (vectors, parents, files, rows) first, then the course."""
+    documents: DocumentService = request.app.state.documents
+    documents.delete_course(session, user, course_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

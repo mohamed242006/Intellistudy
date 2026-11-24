@@ -73,6 +73,16 @@ class StaticRuleTests(unittest.TestCase):
                         offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
         self.assertEqual(offenders, [])
 
+    def test_no_bidi_control_characters_in_sources(self) -> None:  # finding F-M2-08 ("Trojan Source")
+        bidi = {0x202A, 0x202B, 0x202C, 0x202D, 0x202E, 0x2066, 0x2067, 0x2068, 0x2069, 0x200E, 0x200F}
+        offenders = []
+        for base in ("ai", "backend", "tests", "evaluation"):
+            for path in sorted((ROOT / base).rglob("*.py")):
+                for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+                    if any(ord(ch) in bidi for ch in line):
+                        offenders.append(f"{path.relative_to(ROOT)}:{number}")
+        self.assertEqual(offenders, [])
+
     def test_no_env_file_is_tracked(self) -> None:  # SEC-02 / S-01
         try:
             tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout

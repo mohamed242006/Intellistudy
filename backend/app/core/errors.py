@@ -25,12 +25,14 @@ PROBLEM_JSON = "application/problem+json"
 class ApiError(Exception):
     """An error with a fixed, client-safe message. Raise it from services; never put user content in ``detail``."""
 
-    def __init__(self, status: int, detail: str = "", *, code: str = "", headers: dict[str, str] | None = None) -> None:
+    def __init__(self, status: int, detail: str = "", *, code: str = "", headers: dict[str, str] | None = None,
+                 extra: dict[str, Any] | None = None) -> None:
         super().__init__(detail or HTTPStatus(status).phrase)
         self.status = status
         self.detail = detail
         self.code = code
         self.headers = headers or {}
+        self.extra = extra or {}  # client-safe structured detail (e.g. per-file reason codes)
 
 
 def not_found() -> ApiError:
@@ -56,7 +58,7 @@ def problem(status: int, detail: str = "", *, code: str = "", extra: dict[str, A
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api_error(_: Request, exc: ApiError) -> JSONResponse:
-        return problem(exc.status, exc.detail, code=exc.code, headers=exc.headers)
+        return problem(exc.status, exc.detail, code=exc.code, headers=exc.headers, extra=exc.extra)
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:

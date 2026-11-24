@@ -9,12 +9,12 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base, Timestamps, UTCDateTime, UUIDPrimaryKey
 
-__all__ = ["Base", "Course", "RefreshToken", "Role", "User"]
+__all__ = ["Base", "Course", "Document", "DocumentStatus", "JobStatus", "ProcessingJob", "RefreshToken", "Role", "User"]
 
 
 class Role(StrEnum):
@@ -65,3 +65,68 @@ class Course(UUIDPrimaryKey, Timestamps, Base):
     code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class DocumentStatus(StrEnum):
+    """Processing lifecycle (FR-UPL-05). Only ``ready`` documents are retrievable (contract RET-05)."""
+
+    QUEUED = "queued"
+    VALIDATING = "validating"
+    EXTRACTING = "extracting"
+    CHUNKING = "chunking"
+    EMBEDDING = "embedding"
+    INDEXING = "indexing"
+    READY = "ready"
+    FAILED = "failed"
+    DELETING = "deleting"
+
+
+class Document(UUIDPrimaryKey, Timestamps, Base):
+    """An uploaded file. ``id`` is the ``document_uid`` used in the vector and parent stores (contract VEC-02)."""
+
+    __tablename__ = "documents"
+    __table_args__ = (
+        Index("ix_documents_owner_id", "owner_id"),
+        Index("ix_documents_course_id", "course_id"),
+        Index("ix_documents_course_sha", "course_id", "sha256"),
+    )
+
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    course_id: Mapped[str] = mapped_column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    #: display name only (FILE-02, FILE-08); never part of a path
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_type: Mapped[str] = mapped_column(String(8), nullable=False)  # pdf | docx | pptx (verified from content)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default=DocumentStatus.QUEUED.value)
+    progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    warnings: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    ready_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class JobStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class ProcessingJob(UUIDPrimaryKey, Timestamps, Base):
+    """A unit of background work. Carries ids only; the runner re-loads the document with its owner (OWN-10)."""
+
+    __tablename__ = "processing_jobs"
+    __table_args__ = (Index("ix_processing_jobs_status", "status"), Index("ix_processing_jobs_owner_id", "owner_id"))
+
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    document_id: Mapped[str] = mapped_column(String(36), ForeignKey("documents.id", ondelete="CASCADE"),
+                                             nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="ingest")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default=JobStatus.QUEUED.value)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)

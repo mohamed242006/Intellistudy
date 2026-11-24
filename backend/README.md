@@ -9,9 +9,10 @@ RET-06, ...) are cited in code and tests.
 | Milestone | Scope | State |
 |---|---|---|
 | M0 | Foundations + security baseline: settings, logging with redaction, RFC 7807 errors, security headers, CORS allowlist, body limits, rate-limit scaffold, SQLAlchemy + Alembic, LLM provider interface (DeepSeek / OpenAI / local), AI service container, `/api/v1/health`, CI | done |
-| M1 | Identity, courses, ownership: register/login/refresh/logout/logout-all/me/change-password, Argon2id, HS256 access tokens, rotating refresh tokens with reuse detection, lockout, rate limits, course CRUD through `get_owned`; release gate `docs/SECURITY_MERGE_GATE.md` (79 items, all passing) | done (CI on push) |
-| M2 | Documents and processing | next |
-| M3-M5 | Grounded chat, summaries + quiz generation, quiz taking + demo | planned |
+| M1 | Identity, courses, ownership: register/login/refresh/logout/logout-all/me/change-password, Argon2id, HS256 access tokens, rotating refresh tokens with reuse detection, lockout, rate limits, course CRUD through `get_owned`; release gate `docs/SECURITY_MERGE_GATE.md` (79 items, all passing) | done (CI green) |
+| M2 | Documents and processing: streaming upload, file validation, ZIP-bomb and encryption checks, ownership-safe storage, sandboxed parser process, job runner; gate M2 section (39 items) | done (CI on push) |
+| M3 | Grounded chat | next |
+| M4-M5 | Summaries + quiz generation, quiz taking + demo | planned |
 
 ## Run locally (demo profile)
 
@@ -29,7 +30,7 @@ uvicorn --factory backend.app.main:create_app --host 127.0.0.1 --port 8000
 
 Then open `http://127.0.0.1:8000/api/v1/health` or the interactive docs at `/docs` (disabled in `prod`).
 
-## Endpoints (M1)
+## Endpoints (M1-M2)
 
 | Method and path | Auth | Notes |
 |---|---|---|
@@ -40,7 +41,11 @@ Then open `http://127.0.0.1:8000/api/v1/health` or the interactive docs at `/doc
 | `POST /api/v1/auth/logout-all` | Bearer | revokes every session and every existing access token |
 | `POST /api/v1/auth/change-password` | Bearer | revokes everything, returns a fresh session |
 | `GET /api/v1/auth/me` | Bearer | own profile |
-| `POST/GET /api/v1/courses`, `GET/PATCH/DELETE /api/v1/courses/{id}` | Bearer | owner-scoped; another user's or a malformed id is the same 404 |
+| `POST/GET /api/v1/courses`, `GET/PATCH/DELETE /api/v1/courses/{id}` | Bearer | owner-scoped; another user's or a malformed id is the same 404; deleting a course removes its documents, vectors and files |
+| `POST /api/v1/courses/{id}/documents` | Bearer | multipart field `files` (1-10 PDF/DOCX/PPTX, 100 MB each); 202 with `queued` documents; rejected files listed with reason codes |
+| `GET /api/v1/courses/{id}/documents`, `GET /api/v1/documents/{id}` | Bearer | status (`queued`, `extracting`, `embedding`, `indexing`, `ready`, `failed`), progress, page/chunk counts, `error_code` + `error_message` |
+| `GET /api/v1/documents/{id}/file` | Bearer | the original, as an attachment |
+| `POST /api/v1/documents/{id}/retry`, `DELETE /api/v1/documents/{id}` | Bearer | retry failed documents; delete removes vectors, parents and the file |
 
 Access tokens are accepted only in `Authorization: Bearer ...` (never query strings or cookies). The browser keeps
 the access token in memory and calls `refresh` when it expires (15 minutes). Over plain `http://localhost` browsers
@@ -84,8 +89,10 @@ backend/
                          events), errors (RFC 7807), middleware, ratelimit
     db/                  base (portable types), session (SQLite pragmas), models, migrate
     providers/           LLMProvider interface; DeepSeek / OpenAI / Local (FutureLocalProvider) providers; factory
-    services/            auth (sessions, lockout, revocation), ownership (get_owned), courses, ai_container (the only
-                         module touching stores)
+    services/            auth, ownership (get_owned), courses, documents, uploads (streaming receiver), storage,
+                         sandbox (runs and validates the parser child), jobs (runner), ai_container (the only module
+                         touching stores)
+    worker/              code that runs inside the sandboxed parser process: preflight checks, parse_child entry point
     api/v1/              routers: health, auth, courses; schemas (every request model forbids unknown fields)
   migrations/            Alembic environment and revisions
   tests/                 unittest suites: M0 tests, static architecture rules, and the M1 gate tests test_g1_*.py

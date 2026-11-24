@@ -20,6 +20,10 @@ from ai.ingestion.models import OCRError
 
 logger = logging.getLogger(__name__)
 
+#: Seconds Tesseract may spend on one image before it is killed (0 = no limit). Off by default so existing callers
+#: behave as before; the backend's sandboxed parser sets it (backend security contract UPL-08).
+DEFAULT_TIMEOUT_SECONDS: float = 0.0
+
 
 @dataclass(slots=True)
 class OCRResult:
@@ -67,7 +71,9 @@ class OCRProcessor:
         min_image_confidence: float = 55.0,
         min_ocr_side: int = 1000,
         max_ocr_side: int = 3500,
+        timeout: float | None = None,
     ) -> None:
+        self.timeout = DEFAULT_TIMEOUT_SECONDS if timeout is None else timeout
         self.dpi = dpi
         self.lang = lang
         self.min_word_confidence = min_word_confidence
@@ -183,7 +189,7 @@ class OCRProcessor:
         """Run Tesseract and rebuild text (line/paragraph aware) with a mean confidence."""
         try:
             data = pytesseract.image_to_data(
-                image, lang=self.lang, output_type=pytesseract.Output.DICT
+                image, lang=self.lang, output_type=pytesseract.Output.DICT, timeout=self.timeout
             )
         except Exception as exc:
             raise OCRError(f"OCR failed on {label}: {exc}") from exc

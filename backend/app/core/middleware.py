@@ -91,16 +91,18 @@ class SecurityHeadersMiddleware:
 class BodySizeLimitMiddleware:
     """Reject request bodies over ``max_bytes`` with 413 (HTTP-06), counting bytes as they arrive.
 
-    Paths in ``exempt_prefixes`` (streaming uploads, which enforce their own per-file limit, UPL-02) are skipped.
+    ``exempt`` lists (method, full-path regex) pairs for streaming uploads, which enforce their own per-file limit
+    (UPL-02). Patterns are anchored and exact: a prefix would exempt unrelated routes.
     """
 
-    def __init__(self, app: ASGIApp, *, max_bytes: int, exempt_prefixes: Iterable[str] = ()) -> None:
+    def __init__(self, app: ASGIApp, *, max_bytes: int, exempt: Iterable[tuple[str, str]] = ()) -> None:
         self.app = app
         self.max_bytes = max_bytes
-        self.exempt = tuple(exempt_prefixes)
+        self.exempt = tuple((method, re.compile(pattern)) for method, pattern in exempt)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        exempt = bool(self.exempt) and scope.get("path", "").startswith(self.exempt)
+        exempt = scope["type"] == "http" and any(
+            scope.get("method") == method and pattern.fullmatch(scope.get("path", "")) for method, pattern in self.exempt)
         if scope["type"] != "http" or exempt:
             await self.app(scope, receive, send)
             return

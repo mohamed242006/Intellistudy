@@ -60,6 +60,10 @@ class M1Case(unittest.TestCase):
     def settings_overrides(self) -> dict[str, Any]:
         return {}
 
+    def make_ai(self) -> Any:
+        """An AIContainer to inject (M2+: fake embedder, in-memory stores); None = the real lazy container."""
+        return None
+
     def setUp(self) -> None:
         self.tmp = tempfile.mkdtemp(prefix="intellistudy-m1-")
         self.addCleanup(shutil.rmtree, self.tmp, True)
@@ -67,7 +71,7 @@ class M1Case(unittest.TestCase):
         upgrade(self.settings.database_url)
         self.clock = FakeClock()
         limiter = InMemoryRateLimiter(clock=self.clock.monotonic) if self.real_rate_limits else NoLimiter()
-        self.app = create_app(self.settings, rate_limiter=limiter, clock=self.clock)
+        self.app = create_app(self.settings, rate_limiter=limiter, clock=self.clock, ai=self.make_ai())
         _quiet_json_handler()
         self._clients: list[TestClient] = []
         if self.with_users:

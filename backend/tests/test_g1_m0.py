@@ -53,6 +53,17 @@ class CiGateTests(unittest.TestCase):
         self.assertEqual(sorted(set(names)), sorted(names), "duplicate gate tests")
         self.assertEqual(set(names), ids)
 
+    def test_every_m2_gate_item_has_exactly_one_test(self) -> None:
+        """Same rule for the M2 section: one ``test_g2_<id>_...`` per G2 row, no orphan tests."""
+        gate = (ROOT / "docs" / "SECURITY_MERGE_GATE.md").read_text(encoding="utf-8")
+        ids = {i.lower().replace("-", "_") for i in re.findall(r"^\| (G2-[A-Z0-9]+-\d+) \|", gate, re.M)}
+        names: list[str] = []
+        for path in (ROOT / "backend" / "tests").glob("test_g2_*.py"):
+            names += re.findall(r"def test_(g2_[a-z0-9]+_\d+)_", path.read_text(encoding="utf-8"))
+        self.assertTrue(ids)
+        self.assertEqual(sorted(set(names)), sorted(names), "duplicate gate tests")
+        self.assertEqual(set(names), ids)
+
     def test_g1_m0_07_static_rules_still_pass(self) -> None:
         result = unittest.TestResult()
         unittest.defaultTestLoader.loadTestsFromTestCase(test_static_rules.StaticRuleTests).run(result)

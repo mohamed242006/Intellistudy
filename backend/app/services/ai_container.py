@@ -19,18 +19,42 @@ from backend.app.providers import build_provider
 from backend.app.providers.openai_compatible import OpenAICompatibleProvider
 
 if TYPE_CHECKING:
+    from ai.chunking.indexing import IndexingService
     from ai.chunking.interfaces import Embedder, ParentStore, VectorStore
     from ai.retrieval import RetrievalService
 
 
+class _NoEmbedder:
+    """Deletion never embeds; this avoids loading the embedding model just to delete vectors."""
+
+    dimension = 384
+
+    def __init__(self, model_name: str) -> None:
+        self.model_name = model_name
+
+    def embed_documents(self, texts: Any) -> Any:  # pragma: no cover - never called by remove_document
+        raise RuntimeError("deletion does not embed")
+
+    def embed_query(self, text: str) -> Any:  # pragma: no cover
+        raise RuntimeError("deletion does not embed")
+
+
 class AIContainer:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        embedder: Embedder | None = None,
+        vector_store: VectorStore | None = None,
+        parent_store: ParentStore | None = None,
+    ) -> None:
+        """Components can be injected (tests: fake embedder, in-memory stores); otherwise they load lazily."""
         self._settings = settings
-        self._lock = threading.Lock()
-        self._embedder: Embedder | None = None
+        self._lock = threading.RLock()
+        self._embedder: Embedder | None = embedder
         self._reranker: Any = None
-        self._vector_store: VectorStore | None = None
-        self._parent_store: ParentStore | None = None
+        self._vector_store: VectorStore | None = vector_store
+        self._parent_store: ParentStore | None = parent_store
         self._retrieval: RetrievalService | None = None
         self._provider: OpenAICompatibleProvider | None = build_provider(settings)
 
@@ -97,6 +121,23 @@ class AIContainer:
 
                 self._retrieval = RetrievalService(embedder, store, parent_store=parents, reranker=reranker)
             return self._retrieval
+
+    def indexing(self) -> IndexingService:
+        """Indexing for one document at a time; callers pass a ``document_uid`` from an owned row (VEC-04)."""
+        from ai.chunking.indexing import IndexingService
+
+        return IndexingService(self.embedder(), self.vector_store(), parent_store=self.parent_store())
+
+    def remove_document(self, document_uid: str) -> int:
+        """Delete a document's vectors and parent chunks (ISO-03). ``document_uid`` comes from an owned row."""
+        from ai.chunking.config import EMBEDDING_MODEL, collection_name
+        from ai.chunking.indexing import IndexingService
+
+        # the same collection the vectors were written to: the embedder's model, without loading the model
+        model = self._embedder.model_name if self._embedder is not None else EMBEDDING_MODEL
+        service = IndexingService(_NoEmbedder(model), self.vector_store(), parent_store=self.parent_store(),
+                                  collection=collection_name(model))
+        return service.remove_document(document_uid)
 
     def close(self) -> None:
         if self._provider is not None:

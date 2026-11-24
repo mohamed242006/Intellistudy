@@ -198,7 +198,7 @@ Vertical-slice milestone M0 of the Backend Vertical Slice; security rules from [
 - Tests: 74 in `backend/tests` (config and secrets, HTTP hardening, provider contracts, redaction, rate limits, database, static architecture rules for VEC-03/VEC-04/OWN-03/SEC-02). CI workflow `.github/workflows/backend.yml` (gitleaks on full history, pip-audit with recorded exceptions, ruff, mypy, both test suites) and `.pre-commit-config.yaml` + `.gitleaks.toml` added; CI ran green on GitHub (run 1, commit `7892321`).
 - Dependency audit (2026-11-24): Pillow 12.3.0 -> 13.0.0 (42 advisories, several in decoders reachable from images inside uploads) and setuptools -> 84.2.1; the 800-test `ai/` suite passes on Pillow 13. chromadb 1.5.9 has 4 server-mode advisories with no fix; recorded as an exception (contract Appendix C) because the embedded client is used; running Chroma as a server is blocked until they are fixed.
 
-### 3.13 Backend identity, courses and ownership, M1 (`backend/`) - DONE 2026-11-24 (CI on push pending)
+### 3.13 Backend identity, courses and ownership, M1 (`backend/`) - DONE 2026-11-24 (CI run #2 green)
 Release gate: [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md), 79 items; all pass locally (evidence table in the gate).
 - Endpoints: `/api/v1/auth/{register, login, refresh, logout, logout-all, me, change-password}`, `/api/v1/courses` (create, list) and `/api/v1/courses/{id}` (get, patch: rename / archive, delete). Migration `0002_users_tokens_courses` (users, refresh_tokens, courses; `courses.owner_id` non-nullable FK).
 - Passwords: Argon2id (default m=64 MiB, t=3, p=1; contract floor m=19 MiB, t=2), rehash on login when parameters change, policy 10-128 chars with a letter and a digit and not a common password; e-mails unique case-insensitively; a dummy Argon2 verification for unknown e-mails so login timing does not reveal accounts.
@@ -208,6 +208,18 @@ Release gate: [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md), 79 items; all 
 - Ownership: `services/ownership.get_owned` is the single choke point (canonical-UUID check, id **and** owner in one query, identical 404 for missing / foreign / malformed ids, security event only for foreign ids); list queries filter by owner; request models forbid unknown fields; the ADMIN role grants no course access.
 - Tests: 80 gate tests (`backend/tests/test_g1_*.py`, one per gate item plus a traceability test) using a fake clock, real migrations and per-user clients; 154 backend tests in total. New dependencies argon2-cffi 25.1.0 and PyJWT 2.15.1 (lock updated, pip-audit clean apart from the recorded exceptions).
 - Not in M1 (contract SHOULDs, later): JWT key rotation with `kid` (JWT-08), purge job for expired refresh tokens (RT-09), e-mail verification and password reset (FR-AUTH-03/06).
+
+### 3.14 Backend documents and processing, M2 (`backend/`) - DONE 2026-11-24 (CI on push pending)
+Gate: [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md), M2 section, 39 items passing locally; findings F-M2-01..14 in
+[`backend_security_contract.md`](backend_security_contract.md) Appendix D (contract v1.1: UPL-06, UPL-08, UPL-12 updated).
+- Endpoints: `POST/GET /api/v1/courses/{id}/documents` (streaming multipart upload of 1-10 files; list), `GET /api/v1/documents/{id}` (status, progress, page/chunk counts, fixed error code + sentence), `GET /api/v1/documents/{id}/file` (attachment download), `POST /api/v1/documents/{id}/retry`, `DELETE /api/v1/documents/{id}`; course deletion now cascades through documents. Migration `0003_documents_jobs`.
+- Upload: course ownership checked before any byte is stored; python-multipart callback parser writes each file to an exclusive 0600 file while counting and hashing, aborting at 100 MB (also for chunked bodies); extension + magic-byte agreement; 10 files per request, 1 GB quota, 20 files/hour, at most 5 active jobs per user; duplicates only within the same user and course.
+- Storage: `{root}/{owner}/{document}/original.{ext}`, UUID components only, every path checked to stay inside the root, 0700/0600, atomic placement, stale partial uploads swept at startup; client file names are display-only (normalised, no control/bidi characters).
+- Sandboxed parsing (`backend/app/worker/`): a child process (`python -m backend.app.worker.parse_child`) with an allowlisted environment (no secrets), `RLIMIT_AS`/`RLIMIT_CPU`/`RLIMIT_FSIZE`/no core dumps, Pillow bomb guard, 30 s Tesseract timeout; the parent enforces a 10-minute wall clock and a 2 GiB resident-memory watchdog over the process group. Preflight before any parser: ZIP inspection (500 MB uncompressed, ratio 100, 10,000 entries, traversal names, duplicate and overlapping entries, ZIP encryption), macros (`vbaProject.bin`, macro-enabled content types), encrypted OOXML (OLE `EncryptedPackage`) vs legacy formats, password-protected PDFs, page/slide limit (300). The child returns JSON only; the parent rebuilds chunks from an exact field set and checks each chunk's user, course and document ids.
+- Jobs: `processing_jobs` table, one in-process runner thread, atomic claim by conditional UPDATE, re-load of the document with its owner at every stage, statuses queued -> extracting -> embedding -> indexing -> ready / failed / deleting with progress, one retry for infrastructure errors, partial index removed on failure, deletion during processing finished by the runner, interrupted jobs requeued at startup. Measured on the real stack (live run): AOP lecture 1 PDF -> ready (35 pages, 53 chunks), `SPE_l1.pptx` -> ready in 2.2 s (86 slides, 68 chunks), BGE + Chroma loaded lazily.
+- `ai/` change: `OCRProcessor` has an opt-in per-call Tesseract timeout (default off; 800-test `ai/` suite unchanged).
+- Tests: 39 M2 gate tests (`backend/tests/test_g2_*.py`, all generated fixtures incl. ZIP bomb, overlapping-entry ZIP, encrypted PDF/OOXML, macro DOCX, 900-megapixel PNG, hanging / memory-hungry / env-probing children); static rule against bidi control characters in sources (finding F-M2-08); 195 backend tests in total. New dependency python-multipart 0.0.34.
+- **For M3 (finding F-M2-10):** vectors exist before a document is `ready`, so every retrieval must pass `document_uids` = the course's `ready` documents (RET-03, RET-05).
 
 ---
 
@@ -226,12 +238,12 @@ Intellistudy/
 │   ├── storage/       sqlite_parent_store.py (SQLiteParentStore)
 │   ├── retrieval/     models, service (RetrievalService), references, rerank, assessment, calibration
 │   └── answering/     models, llm, context, prompt, citations, grounding, refusal, service (AnswerService)
-├── backend/           (M0 3.12, M1 3.13; see backend/README.md)
+├── backend/           (M0 3.12, M1 3.13, M2 3.14; see backend/README.md)
 │   ├── app/           main.py (create_app), core/ (config, clock, passwords, tokens, logging, errors, middleware,
 │   │                  ratelimit), db/, providers/ (DeepSeek, OpenAI, Local), services/ (auth, ownership, courses,
 │   │                  ai_container), api/v1/ (health, auth, courses, schemas)
-│   ├── migrations/    Alembic env + versions (0001_baseline, 0002_users_tokens_courses); alembic.ini
-│   ├── tests/         154 unittest tests: M0, static rules, M1 gate (test_g1_*)
+│   ├── migrations/    Alembic env + versions (0001-0003: baseline, users/tokens/courses, documents/jobs); alembic.ini
+│   ├── tests/         195 unittest tests: M0, static rules, M1 gate (test_g1_*), M2 gate (test_g2_*)
 │   └── requirements.txt   direct dependencies (ranges); exact pins in requirements.lock.txt
 ├── (frontend/)        does not exist yet
 ├── evaluation/        retrieval_dataset, index_builder, retrieval_eval, answer_eval, answer_gold, answer_metrics,
@@ -429,7 +441,7 @@ Platform
 15. Stronger-model run (2026-11-23): DeepSeek flash through the unchanged stack on the pinned retrieval cache, live policy A plus offline B1 / C replays, scored, root-caused and checksummed; evaluation milestone closed (section 11.2, `real_model_eval_report.md` section 11). Move to Linux with a pinned Python 3.12 environment the same day.
 
 ### In progress
-- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Security reference: [`backend_security_contract.md`](backend_security_contract.md) (authoritative for all backend work; rule ids cited in code and tests). Milestones: **M0 foundations + security baseline - done 2026-11-24 (3.12)**; **M1 identity, courses, ownership - done 2026-11-24 (3.13; gate [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md): 79 items passing locally, CI link pending)**; M2 next; M2 documents + processing; M3 grounded chat; M4 summaries + quiz generation; M5 quiz taking, end-to-end demo, security verification. Quiz MVP (decided 2026-11-24): multiple choice + true/false, retry incorrect answers, auto-grading, citations; no short-answer, essay or adaptive exams. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
+- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Security reference: [`backend_security_contract.md`](backend_security_contract.md) (authoritative for all backend work; rule ids cited in code and tests). Milestones: **M0 foundations + security baseline - done 2026-11-24 (3.12)**; **M1 identity, courses, ownership - done 2026-11-24 (3.13; gate: 79 items, CI green)**; **M2 documents + processing - done 2026-11-24 (3.14; gate [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md) M2: 39 items passing locally, CI on push)**; M3 next; M2 documents + processing; M3 grounded chat; M4 summaries + quiz generation; M5 quiz taking, end-to-end demo, security verification. Quiz MVP (decided 2026-11-24): multiple choice + true/false, retry incorrect answers, auto-grading, citations; no short-answer, essay or adaptive exams. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
 - Housekeeping: keep this file current; push branch `post-eval-quality`; archive `evaluation/results/` outside the machine (git-ignored, checksummed).
 - Table retrieval quality and table spacer columns (known issues).
 
@@ -644,6 +656,7 @@ Detail: section 6 (corpus composition and coverage assessment), section 7 (table
 
 ## 13. Changelog of this file
 
+- **2026-11-24 M2 implemented**: new §3.14 (upload, storage, sandboxed parsing, jobs; 39 gate tests; findings F-M2-01..14); §3.13 records the green M1 CI run; §8 milestone line; contract v1.1 (UPL-06, UPL-08, UPL-12, Appendix D); M2 section in `SECURITY_MERGE_GATE.md`.
 - **2026-11-24 M1 implemented**: new §3.13 (endpoints, password, token, refresh, lockout and ownership design; 80 gate tests); §3.12 records the green M0 CI run; §8 milestone line. Gate evidence table added to `SECURITY_MERGE_GATE.md`; `backend/README.md` endpoint table.
 - **2026-11-24 M1 security merge gate**: `docs/SECURITY_MERGE_GATE.md` added and linked from §8; M0 CI confirmed green on GitHub (run 1, commit `7892321`: secret scan, dependency audit, lint, types, tests).
 - **2026-11-24 M0 backend foundation**: new §3.12; §4 backend tree and environment versions (Pillow 13, SQLAlchemy, Alembic); §7 platform bullets (CI partly in place, backend foundation, version control); §8 milestone list and the approved quiz-MVP scope; tech-stack line updated. Contract: Appendix C (recorded dependency exceptions) and decided items (CORS, JWT, quiz scope).

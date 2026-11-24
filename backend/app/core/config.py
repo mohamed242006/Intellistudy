@@ -103,6 +103,21 @@ class Settings(BaseSettings):
     max_pages: int = Field(default=300, gt=0)  # UPL-07
     max_files_per_request: int = Field(default=10, gt=0)  # UPL-03
     storage_quota_bytes: int = Field(default=1024**3, gt=0)  # UPL-03
+    max_queued_jobs_per_user: int = Field(default=5, gt=0)  # contract 9a
+
+    # --- ZIP container checks before parsing (UPL-05) ------------------------------------------------------------
+    zip_max_uncompressed_bytes: int = Field(default=500 * 1024 * 1024, gt=0)
+    zip_max_ratio: float = Field(default=100.0, gt=1)  # real corpus peaks at 54:1 (2026-11-24)
+    zip_max_entries: int = Field(default=10_000, gt=0)
+
+    # --- sandboxed parsing (UPL-08, UPL-12) ---------------------------------------------------------------------
+    parse_timeout_seconds: int = Field(default=600, gt=0)  # wall clock per document
+    parse_rss_limit_bytes: int = Field(default=2 * 1024**3, gt=0)  # resident memory; the watchdog kills above it
+    parse_address_space_bytes: int = Field(default=8 * 1024**3, gt=0)  # coarse RLIMIT_AS ceiling (see finding F-M2-01)
+    parse_max_output_bytes: int = Field(default=256 * 1024 * 1024, gt=0)  # child output is untrusted, size-bounded
+    ocr_timeout_seconds: float = Field(default=30.0, gt=0)  # per image
+    chunk_tokenizer: str = Field(default="hf", pattern="^(hf|approx)$")  # "approx" only for tests / offline
+    worker_enabled: bool = True  # background job runner; tests drive jobs explicitly
 
     # --- LLM provider (contract SEC-01, SEC-07) ----------------------------------------------------------------
     llm_provider: LLMProviderName = LLMProviderName.DEEPSEEK

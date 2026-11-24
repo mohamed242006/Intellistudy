@@ -38,10 +38,5 @@ def update_course(session: Session, owner: User, course_id: str, changes: dict[s
     session.commit()
     return course
 
-
-def delete_course(session: Session, owner: User, course_id: str) -> None:
-    """Delete the course (ISO-03). In M1 a course has no children; M2+ extend the cascade (documents, vectors,
-    files, summaries, quizzes, conversations) in the order the contract prescribes."""
-    course = get_owned(session, Course, course_id, owner.id, resource=RESOURCE)
-    session.delete(course)
-    session.commit()
+# Course deletion lives in DocumentService.delete_course: since M2 a course owns documents, whose vectors, parents and
+# files must be removed first (ISO-03).

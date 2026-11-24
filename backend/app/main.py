@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.v1 import router as v1_router
+from backend.app.api.v1.documents import UPLOAD_ROUTE
 from backend.app.core.clock import Clock, SystemClock
 from backend.app.core.config import Settings, get_settings
 from backend.app.core.errors import UnhandledErrorMiddleware, install_error_handlers
@@ -32,10 +33,18 @@ from backend.app.core.tokens import TokenService
 from backend.app.db.session import create_db_engine, create_session_factory
 from backend.app.services.ai_container import AIContainer
 from backend.app.services.auth import AuthService
+from backend.app.services.documents import DocumentService
+from backend.app.services.jobs import JobRunner, Parser
+from backend.app.services.storage import FileStorage
 
 
 def create_app(
-    settings: Settings | None = None, *, rate_limiter: RateLimiter | None = None, clock: Clock | None = None
+    settings: Settings | None = None,
+    *,
+    rate_limiter: RateLimiter | None = None,
+    clock: Clock | None = None,
+    ai: AIContainer | None = None,
+    parser: Parser | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.secret_values())
@@ -43,13 +52,21 @@ def create_app(
     clock = clock or SystemClock()
     limiter = rate_limiter or InMemoryRateLimiter(clock=clock.monotonic)
     engine = create_db_engine(settings.database_url)
-    ai = AIContainer(settings)
+    ai = ai or AIContainer(settings)
     passwords = PasswordService(settings)
     auth = AuthService(settings, clock, passwords, TokenService(settings, clock), limiter)
+    session_factory = create_session_factory(engine)
+    storage = FileStorage(settings.storage_root)
+    documents = DocumentService(settings, storage, ai, limiter, clock)
+    jobs = JobRunner(settings, session_factory, ai, storage, clock, **({"parser": parser} if parser else {}))
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        storage.sweep_incoming()  # FILE-07: partial uploads left by a crash
+        if settings.worker_enabled:
+            jobs.start()
         yield
+        jobs.stop()
         ai.close()
         engine.dispose()
 
@@ -64,7 +81,10 @@ def create_app(
     )
     app.state.settings = settings
     app.state.engine = engine
-    app.state.session_factory = create_session_factory(engine)
+    app.state.session_factory = session_factory
+    app.state.storage = storage
+    app.state.documents = documents
+    app.state.jobs = jobs
     app.state.ai = ai
     app.state.clock = clock
     app.state.rate_limiter = limiter
@@ -89,13 +109,8 @@ def create_app(
     app.add_middleware(
         BodySizeLimitMiddleware,
         max_bytes=settings.max_json_body_bytes,
-        exempt_prefixes=_upload_paths(),
+        exempt=[UPLOAD_ROUTE],  # the streaming upload enforces its own per-file limit (UPL-02)
     )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestIdMiddleware)
     return app
-
-
-def _upload_paths() -> tuple[str, ...]:
-    """No upload route exists in M0, so nothing is exempt yet; M2 narrows this to the exact upload path."""
-    return ()
