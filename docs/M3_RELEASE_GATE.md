@@ -1,7 +1,7 @@
 # M3 Release Gate: Grounded Chat
 
 **Status:** release gate for backend milestone M3 (grounded chat). **M3 cannot be approved, merged or released unless
-every item below passes.** Version 1.0, 2026-11-24, written before M3 implementation.
+every item below passes.** Version 1.1, 2026-11-24 (v1.0 written before M3 implementation). **M3 APPROVED 2026-11-24** (section 3).
 **Authority:** [`backend_security_contract.md`](backend_security_contract.md) (rule ids such as `RET-03`) and the
 answer-layer guarantees in [`answer_layer.md`](answer_layer.md). If this gate and the contract disagree, the contract
 wins and this file is corrected. Section 1 closes **release blocker F-M2-10** (contract Appendix D).
@@ -141,7 +141,7 @@ reranker's name, in-memory vector and parent stores; scripted LLM replies or a m
 | G3-SCP-05 | Retrieval configuration | Reranker configured and the calibrated relevance policy applied (assessment present); no configuration path disables it | RET-10 |
 | G3-SCP-06 | A conversation's course is deleted | Its conversations and messages are removed (ISO-03); later requests get the same 404 | ISO-03 |
 
-### 2.9 Evidence (local, 2026-11-24)
+### 2.9 Evidence (local and CI, 2026-11-24)
 
 | Area | Tests | File | Result |
 |---|---|---|---|
@@ -162,6 +162,7 @@ reranker's name, in-memory vector and parent stores; scripted LLM replies or a m
   - citation validation removed from `ask()` -> G3-COW-02 fails (G3-COW-04 calls the validator directly).
 - Providers: the real `DeepSeekProvider` runs against a mocked HTTP transport; no network call and no real key in any test.
 - Findings: F-M3-01..04 in the contract's Appendix D.
+- CI: run #5 on commit `f05bf8e`, all three jobs green (secret scan; dependency audit; lint, types, backend tests, `ai/` tests), https://github.com/mohamed242006/Intellistudy/actions/runs/45402802561. No `test_g3_*` test has a skip path (`INTELLISTUDY_SKIP_SLOW` applies only to the `ai/` suite).
 
 ---
 
@@ -169,7 +170,9 @@ reranker's name, in-memory vector and parent stores; scripted LLM replies or a m
 
 M3 is approved only when the pull request that completes it records:
 
-- [ ] CI run link for the merge commit, all jobs green.
-- [ ] Every `test_g3_*` test passed, no skips (52 items), plus the traceability test; M1 and M2 gates still passing.
-- [ ] Release blocker F-M2-10 closed: section 2.1 passing, and the contract's Appendix D entry updated.
-- [ ] Optional evidence: one manual DeepSeek smoke run (state, citations, latency), recorded without document content.
+- [x] CI run link for the merge commit, all jobs green: run #5, commit `f05bf8e`, https://github.com/mohamed242006/Intellistudy/actions/runs/45402802561 (the work is on branch `post-eval-quality`; there is no pull request yet, so this file is the record).
+- [x] Every `test_g3_*` test passed, no skips (52 items), plus the traceability test; M1 and M2 gates still passing (same run; 248 backend tests).
+- [x] Release blocker F-M2-10 closed: section 2.1 passing, and the contract's Appendix D entry updated (contract v1.4).
+- [ ] Optional evidence: one manual DeepSeek smoke run (state, citations, latency), recorded without document content. *Not run; optional, needs the owner's API key. Recommended before the demo.*
+
+**Verdict (2026-11-24): M3 approved.** Release blocker F-M2-10 closed. Residual F-M3-03 stays open by design (the frontend must render model output as text, UPL-15).

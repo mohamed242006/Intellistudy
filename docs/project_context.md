@@ -6,12 +6,12 @@ Graduation project, Computer Engineering, Ain Shams University, team of four.
 > **How to use this file.** It describes what exists in the repository today, why it was built that way,
 > how it was validated, and what is still open. Read sections 2-5 before touching `ai/`.
 > Assumed reader: an engineer or an AI assistant continuing the work with no other context.
-> Last updated: 2026-11-24 (Backend Vertical Slice recorded as the active priority; future-work register added as section 12;
-> earlier passes: DeepSeek evaluation, move to Linux, equation-extraction investigation; see 13). Commit state:
+> Last updated: 2026-11-24 (backend M0-M3 done, M3 approved with CI green, release blocker F-M2-10 closed, M4 next; earlier
+> passes: future-work register, DeepSeek evaluation, move to Linux, equation-extraction investigation; see 13). Commit state:
 > commit `1660115` holds ingestion, chunking, embedding, Chroma, the SQLite parent store and the base retrieval service;
 > commit `1a38fad` ("Answering+ eval pt1") holds everything added up to 2026-11-15 (answer layer, retrieval add-ons,
-> figure modules, `evaluation/`, `docs/`). Uncommitted as of 2026-11-23: `requirements.lock.txt` and the 2026-11-23 doc
-> edits. `evaluation/results/` is git-ignored and exists only locally (restored by hand after the machine move).
+> figure modules, `evaluation/`, `docs/`). Everything since (lock file, post-evaluation fixes, security contract, backend
+> M0-M3) is on branch `post-eval-quality`, pushed, CI green. `evaluation/results/` is git-ignored and exists only locally (restored by hand after the machine move).
 >
 > **Labels used for status.** *Measured* = a number produced by a command on this repository (the date says when).
 > *Decision (open)* = a choice nobody has made yet. *Hypothesis* = an expectation not yet measured. *Superseded* =
@@ -209,7 +209,7 @@ Release gate: [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md), 79 items; all 
 - Tests: 80 gate tests (`backend/tests/test_g1_*.py`, one per gate item plus a traceability test) using a fake clock, real migrations and per-user clients; 154 backend tests in total. New dependencies argon2-cffi 25.1.0 and PyJWT 2.15.1 (lock updated, pip-audit clean apart from the recorded exceptions).
 - Not in M1 (contract SHOULDs, later): JWT key rotation with `kid` (JWT-08), purge job for expired refresh tokens (RT-09), e-mail verification and password reset (FR-AUTH-03/06).
 
-### 3.14 Backend documents and processing, M2 (`backend/`) - DONE 2026-11-24 (CI on push pending)
+### 3.14 Backend documents and processing, M2 (`backend/`) - DONE 2026-11-24 (CI run #3 green)
 Gate: [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md), M2 section, 39 items passing locally; findings F-M2-01..14 in
 [`backend_security_contract.md`](backend_security_contract.md) Appendix D (contract v1.1: UPL-06, UPL-08, UPL-12 updated).
 - Endpoints: `POST/GET /api/v1/courses/{id}/documents` (streaming multipart upload of 1-10 files; list), `GET /api/v1/documents/{id}` (status, progress, page/chunk counts, fixed error code + sentence), `GET /api/v1/documents/{id}/file` (attachment download), `POST /api/v1/documents/{id}/retry`, `DELETE /api/v1/documents/{id}`; course deletion now cascades through documents. Migration `0003_documents_jobs`.
@@ -221,15 +221,15 @@ Gate: [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md), M2 section, 39 items p
 - Tests: 39 M2 gate tests (`backend/tests/test_g2_*.py`, all generated fixtures incl. ZIP bomb, overlapping-entry ZIP, encrypted PDF/OOXML, macro DOCX, 900-megapixel PNG, hanging / memory-hungry / env-probing children); static rule against bidi control characters in sources (finding F-M2-08); 195 backend tests in total. New dependency python-multipart 0.0.34.
 - **Release blocker F-M2-10 (declared 2026-11-24):** vectors exist before a document is `ready`. Enforced by `backend/app/services/retrieval.py` (the only path to `RetrievalService`; exact `status == ready` allowlist, `document_uids` on every query, post-search re-check, no store query for an empty scope); tests G3-RDY-01..07 pass and fail under a mutation check.
 
-### 3.15 Backend grounded chat, M3 (`backend/`) - DONE locally 2026-11-24 (CI on push pending)
-Gate: [`M3_RELEASE_GATE.md`](M3_RELEASE_GATE.md), 52 items passing locally, evidence in its section 2.9; findings F-M3-01..04 in
+### 3.15 Backend grounded chat, M3 (`backend/`) - DONE and APPROVED 2026-11-24 (CI run #5 green; F-M2-10 closed)
+Gate: [`M3_RELEASE_GATE.md`](M3_RELEASE_GATE.md), 52 items passing in CI (run #5, commit `f05bf8e`), evidence in its section 2.9, signed off in its section 3; findings F-M3-01..04 in
 [`backend_security_contract.md`](backend_security_contract.md) Appendix D (contract v1.3).
 - Endpoints: `POST/GET /api/v1/courses/{id}/conversations`, `GET/DELETE /api/v1/conversations/{id}` (detail includes the message history), `POST /api/v1/conversations/{id}/messages` (`question` 1-2000 characters, optional `document_ids` 1-100 to narrow the scope). Migration `0004_conversations_messages` (`conversations`, `messages`; both cascade from the course).
 - Flow (`backend/app/services/chat.py`): owned conversation -> question normalised (NFC, control characters removed) -> chat rate limit (20/min) -> per-user daily token budget (429 before any provider call) -> scope resolved by the READY-only layer (3.14) -> unchanged `ai/answering` `AnswerService` over a `BoundRetrieval` that refuses any other user or course -> every citation re-checked against the scope, the document's `ready` status and the retrieved passage text (else refused `scope_violation`) -> answer text sanitised (markdown/HTML images removed) -> state -> stored message.
 - States, precedence confirmed by the team: `refused` > `partial` > `low_confidence` > `answered`; refusal reasons `no_results`, `not_relevant`, `model_declined`, `uncited_answer`, `unsupported_claims`, `llm_unavailable`, `scope_violation`; each with a fixed notice and the nearest material.
 - Provider failures (timeouts, 429/5xx after retries, 4xx, malformed or blank replies, redirects, no provider configured) become `refused` / `llm_unavailable` with status 201; provider error bodies and reasoning text are never returned, stored or logged.
 - `ai/` change: `AnswerService` takes a `Retriever` protocol (typing only; behaviour unchanged).
-- Tests: 52 M3 gate tests (`backend/tests/test_g3_*.py`) plus traceability; 248 backend tests in total. Release blocker F-M2-10 closes when the gate passes in CI.
+- Tests: 52 M3 gate tests (`backend/tests/test_g3_*.py`) plus traceability; 248 backend tests in total. **Release blocker F-M2-10 closed** (contract v1.4). Not yet done: the optional manual DeepSeek smoke run.
 
 ---
 
@@ -422,12 +422,12 @@ Answer layer and its evaluation
 - **Evaluation instrument splits sentences differently from the parser** (`evaluation/answer_metrics.answer_sentences` splits after every period, so "1." list numbers and "e.g." fragments count as uncited claims). Official citation coverage therefore reads lower than the answers are: DeepSeek A after the parser fix 0.87 official vs 0.98 with a parser-aligned splitter. *Decision (open)*: align the instrument and re-score all runs (Qwen included) together, so numbers stay comparable.
 
 Platform
-- **Storage quota and delete cascade not implemented**: the 1 GB per-user quota and cascading document deletion are policy only (see Storage and Retention Policy).
-- **Upload limits missing**: no file-size, page/slide-count, image-count, zip-bomb guard or Tesseract timeout.
+- **Storage quota and delete cascade**: implemented in M2 (3.14): 1 GB per-user quota; deleting a document or course removes rows, vectors, parents and files.
+- **Upload limits**: implemented in M2 (3.14): 100 MB per file, 300 pages/slides, ZIP-bomb and encryption checks, Pillow bomb guard, 30 s Tesseract timeout, sandboxed parser. Residuals F-M2-12..14 (contract Appendix D).
 - **PostgreSQL persistence missing**: users, courses, documents and parent chunks live in SQLite/Chroma files only.
-- **CI/CD partly in place**: GitHub Actions workflow added in M0 (secret scan, dependency audit, lint, types, tests), not yet run on GitHub; no Dockerfile (docker-compose.yml is empty), Tesseract not in any image. Exact pins in `requirements.lock.txt`.
-- Backend has its foundation (M0, 3.12) but no product endpoints yet: auth, courses, upload, jobs, chat, summaries and quizzes arrive in M1-M5. Chroma is single-process (embedded).
-- **Version control**: work up to 2026-11-15 is in `1660115` and `1a38fad`; post-evaluation work, the security contract and M0 are on branch `post-eval-quality` (not pushed). `evaluation/results/` is git-ignored, so evaluation outputs (the Qwen runs, the retrieval cache, the DeepSeek runs) are local only; after the move to Linux they were missing until restored by hand from the old machine, which shows the risk. *Decision (open)*: whether to version them (or archive them elsewhere). *Superseded:* the OneDrive location of the Windows machine.
+- **CI/CD partly in place**: GitHub Actions workflow (secret scan, dependency audit, lint, types, tests) green on every pushed backend milestone (latest: run #5, M3); no Dockerfile (docker-compose.yml is empty), Tesseract not in any image. Exact pins in `requirements.lock.txt`.
+- Backend: auth, courses, upload, processing jobs and grounded chat are built (M0-M3, 3.12-3.15); summaries and quizzes (M4) and quiz taking (M5) are not. Chroma is single-process (embedded).
+- **Version control**: work up to 2026-11-15 is in `1660115` and `1a38fad`; post-evaluation work, the security contract and backend M0-M3 are on branch `post-eval-quality`, pushed to GitHub (latest `f05bf8e`, CI green), not yet merged to the default branch. `evaluation/results/` is git-ignored, so evaluation outputs (the Qwen runs, the retrieval cache, the DeepSeek runs) are local only; after the move to Linux they were missing until restored by hand from the old machine, which shows the risk. *Decision (open)*: whether to version them (or archive them elsewhere). *Superseded:* the OneDrive location of the Windows machine.
 
 ---
 
@@ -451,7 +451,7 @@ Platform
 15. Stronger-model run (2026-11-23): DeepSeek flash through the unchanged stack on the pinned retrieval cache, live policy A plus offline B1 / C replays, scored, root-caused and checksummed; evaluation milestone closed (section 11.2, `real_model_eval_report.md` section 11). Move to Linux with a pinned Python 3.12 environment the same day.
 
 ### In progress
-- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Security reference: [`backend_security_contract.md`](backend_security_contract.md) (authoritative for all backend work; rule ids cited in code and tests). Milestones: **M0 foundations + security baseline - done 2026-11-24 (3.12)**; **M1 identity, courses, ownership - done 2026-11-24 (3.13; gate: 79 items, CI green)**; **M2 documents + processing - done 2026-11-24 (3.14; gate [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md) M2: 39 items passing locally, CI on push)**; **M3 grounded chat - built 2026-11-24 (3.15); release gate [`M3_RELEASE_GATE.md`](M3_RELEASE_GATE.md): all 52 items passing locally, CI on push; M3 cannot be approved unless all pass in CI. Release blocker F-M2-10 (READY-only retrieval) stays open until then**; M2 documents + processing; M3 grounded chat; M4 summaries + quiz generation; M5 quiz taking, end-to-end demo, security verification. Quiz MVP (decided 2026-11-24): multiple choice + true/false, retry incorrect answers, auto-grading, citations; no short-answer, essay or adaptive exams. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
+- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Security reference: [`backend_security_contract.md`](backend_security_contract.md) (authoritative for all backend work; rule ids cited in code and tests). Milestones: **M0 foundations + security baseline - done 2026-11-24 (3.12)**; **M1 identity, courses, ownership - done 2026-11-24 (3.13; gate: 79 items, CI green)**; **M2 documents + processing - done 2026-11-24 (3.14; gate [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md) M2: 39 items, CI green)**; **M3 grounded chat - done and approved 2026-11-24 (3.15; release gate [`M3_RELEASE_GATE.md`](M3_RELEASE_GATE.md): 52 items, CI green; release blocker F-M2-10 closed)**; **M4 summaries + quiz generation - next (write the M4 release gate first)**; M2 documents + processing; M3 grounded chat; M4 summaries + quiz generation; M5 quiz taking, end-to-end demo, security verification. Quiz MVP (decided 2026-11-24): multiple choice + true/false, retry incorrect answers, auto-grading, citations; no short-answer, essay or adaptive exams. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
 - Housekeeping: keep this file current; push branch `post-eval-quality`; archive `evaluation/results/` outside the machine (git-ignored, checksummed).
 - Table retrieval quality and table spacer columns (known issues).
 
@@ -666,6 +666,7 @@ Detail: section 6 (corpus composition and coverage assessment), section 7 (table
 
 ## 13. Changelog of this file
 
+- **2026-11-24 M3 approved**: CI run #5 green on `f05bf8e`; release blocker F-M2-10 closed (contract v1.4); M3 gate signed off; M2 CI (run #3) recorded; §7 platform bullets brought up to date (quota, upload limits, CI, backend endpoints); §8 marks M4 next.
 - **2026-11-24 M3 implemented**: new §3.15 (conversations and messages, chat flow, states, provider failure handling; 52 gate tests passing locally; findings F-M3-01..04); §8 milestone line; contract v1.3; evidence section 2.9 in `M3_RELEASE_GATE.md`.
 - **2026-11-24 M3 release gate and release blocker F-M2-10**: `docs/M3_RELEASE_GATE.md` (52 items in 8 areas: READY-only retrieval, cross-user retrieval isolation, citation presence, citation ownership, prompt injection, chat states, DeepSeek failure handling, retrieval scope); scoped retrieval layer `backend/app/services/retrieval.py` with tests G3-RDY-01..07; contract v1.2.
 - **2026-11-24 M2 implemented**: new §3.14 (upload, storage, sandboxed parsing, jobs; 39 gate tests; findings F-M2-01..14); §3.13 records the green M1 CI run; §8 milestone line; contract v1.1 (UPL-06, UPL-08, UPL-12, Appendix D); M2 section in `SECURITY_MERGE_GATE.md`.
