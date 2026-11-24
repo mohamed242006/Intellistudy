@@ -163,3 +163,16 @@ M1 is complete when all of the following are recorded in the pull request that m
 - [ ] Reviewer confirmation that no endpoint added in M1 reads or writes a user resource outside `get_owned` or an
       owner-filtered list query.
 - [ ] `docs/project_context.md` updated (M1 done, test counts) and any contract change merged first.
+
+### Evidence recorded 2026-11-24 (implementation commit on branch `post-eval-quality`)
+
+| Check | Result |
+|---|---|
+| Gate tests `python -m unittest discover -s backend/tests -t . -p "test_g1_*.py"` | 80 run, **all passed, 0 skipped** (79 gate items + the traceability test that keeps ids and tests one-to-one) |
+| Whole backend suite | 154 passed |
+| `ai/` suite (`INTELLISTUDY_SKIP_SLOW=1`) | 800 passed (17 skipped, 1 expected failure: unchanged from before M1) |
+| Ruff (`ai backend tests evaluation`), MyPy (`ai backend`) | clean |
+| `pip-audit` on the lock file with the Appendix C ignores | no known vulnerabilities |
+| Live `uvicorn` run | register 201, login 200 + scoped cookie, me 200, course 201, refresh 200, reuse 401, no CSRF header 403; neither token appears in the server log |
+| CI on GitHub | **pending**: to be linked here after the push of the M1 commit |
+| Reviewer confirmation (no access outside `get_owned` / owner-filtered lists) | **pending** (static tests G1-OWN-04 and G1-M0-07 pass) |

@@ -8,6 +8,8 @@ alembic==1.20.1
 annotated-doc==0.0.7
 annotated-types==0.8.0
 anyio==4.16.0
+argon2-cffi==25.1.0
+argon2-cffi-bindings==26.2.0
 ast-serialize==0.13.1
 attrs==26.1.0
 bcrypt==5.0.0
@@ -79,6 +81,7 @@ pydantic==2.14.4
 pydantic-core==2.50.5
 pydantic-settings==2.16.3
 pygments==2.21.0
+pyjwt==2.15.1
 pymupdf==1.28.2
 pypdfium2==5.15.2
 pypika==0.51.1

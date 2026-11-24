@@ -8,12 +8,13 @@ import unittest
 import uuid
 from datetime import UTC, datetime, timedelta, timezone
 
+from alembic.script import ScriptDirectory
 from sqlalchemy import String, Table, inspect, select, text
 from sqlalchemy.exc import StatementError
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from backend.app.db.base import Base, Timestamps, UTCDateTime, UUIDPrimaryKey, new_uuid
-from backend.app.db.migrate import upgrade
+from backend.app.db.migrate import alembic_config, upgrade
 from backend.app.db.session import create_db_engine
 
 
@@ -38,7 +39,7 @@ class DatabaseTests(unittest.TestCase):
         self.addCleanup(engine.dispose)
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        self.assertEqual(version, "0001_baseline")
+        self.assertEqual(version, ScriptDirectory.from_config(alembic_config()).get_current_head())
         upgrade(self.url)  # idempotent
 
     def test_sqlite_pragmas(self) -> None:

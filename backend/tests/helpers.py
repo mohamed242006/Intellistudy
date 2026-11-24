@@ -24,6 +24,9 @@ def make_settings(tmp: str | Path | None = None, **overrides: Any) -> Settings:
         "storage_root": base / "storage",
         "llm_provider": "none",
         "jwt_secret": JWT_SECRET,
+        # the contract's minimum Argon2id parameters (JWT-10): still real Argon2id, but fast enough for many logins
+        "argon2_memory_kib": 19456,
+        "argon2_time_cost": 2,
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)

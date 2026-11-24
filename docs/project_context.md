@@ -195,8 +195,19 @@ Vertical-slice milestone M0 of the Backend Vertical Slice; security rules from [
 - SQLAlchemy 2 + Alembic (baseline revision; `python -m backend.app.db.migrate`): portable UUID-string ids, UTC-aware datetimes, naming convention; SQLite with WAL, foreign keys and busy timeout. PostgreSQL needs only `INTELLISTUDY_DATABASE_URL`.
 - LLM providers behind one interface that also satisfies `ai.answering.llm.LLMClient`: `DeepSeekProvider` (default `deepseek-chat`, the validated configuration; other DeepSeek models get `thinking: disabled`), `OpenAIProvider` (`max_completion_tokens` and no `temperature` for reasoning models), `LocalProvider` (= `FutureLocalProvider`; Ollama/vLLM); no redirects followed, retries with jitter on 408/409/429/5xx, provider error bodies redacted in logs and never returned.
 - `AIContainer`: lazy embedder, reranker, Chroma store, parent store and retrieval service; the only backend module allowed to touch the stores (static test). `GET /api/v1/health` reports booleans and names only.
-- Tests: 74 in `backend/tests` (config and secrets, HTTP hardening, provider contracts, redaction, rate limits, database, static architecture rules for VEC-03/VEC-04/OWN-03/SEC-02). CI workflow `.github/workflows/backend.yml` (gitleaks on full history, pip-audit with recorded exceptions, ruff, mypy, both test suites) and `.pre-commit-config.yaml` + `.gitleaks.toml` added; CI has not run on GitHub yet (branch not pushed).
+- Tests: 74 in `backend/tests` (config and secrets, HTTP hardening, provider contracts, redaction, rate limits, database, static architecture rules for VEC-03/VEC-04/OWN-03/SEC-02). CI workflow `.github/workflows/backend.yml` (gitleaks on full history, pip-audit with recorded exceptions, ruff, mypy, both test suites) and `.pre-commit-config.yaml` + `.gitleaks.toml` added; CI ran green on GitHub (run 1, commit `7892321`).
 - Dependency audit (2026-11-24): Pillow 12.3.0 -> 13.0.0 (42 advisories, several in decoders reachable from images inside uploads) and setuptools -> 84.2.1; the 800-test `ai/` suite passes on Pillow 13. chromadb 1.5.9 has 4 server-mode advisories with no fix; recorded as an exception (contract Appendix C) because the embedded client is used; running Chroma as a server is blocked until they are fixed.
+
+### 3.13 Backend identity, courses and ownership, M1 (`backend/`) - DONE 2026-11-24 (CI on push pending)
+Release gate: [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md), 79 items; all pass locally (evidence table in the gate).
+- Endpoints: `/api/v1/auth/{register, login, refresh, logout, logout-all, me, change-password}`, `/api/v1/courses` (create, list) and `/api/v1/courses/{id}` (get, patch: rename / archive, delete). Migration `0002_users_tokens_courses` (users, refresh_tokens, courses; `courses.owner_id` non-nullable FK).
+- Passwords: Argon2id (default m=64 MiB, t=3, p=1; contract floor m=19 MiB, t=2), rehash on login when parameters change, policy 10-128 chars with a letter and a digit and not a common password; e-mails unique case-insensitively; a dummy Argon2 verification for unknown e-mails so login timing does not reveal accounts.
+- Access tokens: HS256 only, required `sub iss aud iat exp jti typ`, 15 minutes, checked against the application clock with 30 s leeway; sub-second `iat`, so `tokens_valid_after` (set by logout-all and password change) revokes exactly; accepted only from one `Authorization: Bearer` header; one generic 401.
+- Refresh tokens: 256-bit opaque values, SHA-256 stored, `__Secure-` cookie scoped to `/api/v1/auth`; rotation claims the row with a conditional UPDATE so concurrent refreshes cannot both win; reuse revokes the family; 7-day idle and 30-day absolute lifetime; refresh and logout require `X-Requested-With: IntelliStudy` and an allowed Origin (CSRF).
+- Lockout 15 min after 5 consecutive failures (also wrong current passwords in change-password), indistinguishable from a wrong password; rate limits on login (per IP and per account), register (per IP) and refresh (per user).
+- Ownership: `services/ownership.get_owned` is the single choke point (canonical-UUID check, id **and** owner in one query, identical 404 for missing / foreign / malformed ids, security event only for foreign ids); list queries filter by owner; request models forbid unknown fields; the ADMIN role grants no course access.
+- Tests: 80 gate tests (`backend/tests/test_g1_*.py`, one per gate item plus a traceability test) using a fake clock, real migrations and per-user clients; 154 backend tests in total. New dependencies argon2-cffi 25.1.0 and PyJWT 2.15.1 (lock updated, pip-audit clean apart from the recorded exceptions).
+- Not in M1 (contract SHOULDs, later): JWT key rotation with `kid` (JWT-08), purge job for expired refresh tokens (RT-09), e-mail verification and password reset (FR-AUTH-03/06).
 
 ---
 
@@ -215,12 +226,12 @@ Intellistudy/
 │   ├── storage/       sqlite_parent_store.py (SQLiteParentStore)
 │   ├── retrieval/     models, service (RetrievalService), references, rerank, assessment, calibration
 │   └── answering/     models, llm, context, prompt, citations, grounding, refusal, service (AnswerService)
-├── backend/           (M0, 3.12; see backend/README.md)
-│   ├── app/           main.py (create_app), core/ (config, logging, errors, middleware, ratelimit), db/ (base,
-│   │                  session, models, migrate), providers/ (DeepSeek, OpenAI, Local), services/ai_container.py,
-│   │                  api/v1/ (health)
-│   ├── migrations/    Alembic env + versions (0001_baseline); alembic.ini
-│   ├── tests/         74 unittest tests incl. static architecture rules
+├── backend/           (M0 3.12, M1 3.13; see backend/README.md)
+│   ├── app/           main.py (create_app), core/ (config, clock, passwords, tokens, logging, errors, middleware,
+│   │                  ratelimit), db/, providers/ (DeepSeek, OpenAI, Local), services/ (auth, ownership, courses,
+│   │                  ai_container), api/v1/ (health, auth, courses, schemas)
+│   ├── migrations/    Alembic env + versions (0001_baseline, 0002_users_tokens_courses); alembic.ini
+│   ├── tests/         154 unittest tests: M0, static rules, M1 gate (test_g1_*)
 │   └── requirements.txt   direct dependencies (ranges); exact pins in requirements.lock.txt
 ├── (frontend/)        does not exist yet
 ├── evaluation/        retrieval_dataset, index_builder, retrieval_eval, answer_eval, answer_gold, answer_metrics,
@@ -418,7 +429,7 @@ Platform
 15. Stronger-model run (2026-11-23): DeepSeek flash through the unchanged stack on the pinned retrieval cache, live policy A plus offline B1 / C replays, scored, root-caused and checksummed; evaluation milestone closed (section 11.2, `real_model_eval_report.md` section 11). Move to Linux with a pinned Python 3.12 environment the same day.
 
 ### In progress
-- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Security reference: [`backend_security_contract.md`](backend_security_contract.md) (authoritative for all backend work; rule ids cited in code and tests). Milestones: **M0 foundations + security baseline - done 2026-11-24 (3.12)**; M1 identity, courses, ownership (next; release gate: [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md), 72 items + 7 M0 checks); M2 documents + processing; M3 grounded chat; M4 summaries + quiz generation; M5 quiz taking, end-to-end demo, security verification. Quiz MVP (decided 2026-11-24): multiple choice + true/false, retry incorrect answers, auto-grading, citations; no short-answer, essay or adaptive exams. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
+- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Security reference: [`backend_security_contract.md`](backend_security_contract.md) (authoritative for all backend work; rule ids cited in code and tests). Milestones: **M0 foundations + security baseline - done 2026-11-24 (3.12)**; **M1 identity, courses, ownership - done 2026-11-24 (3.13; gate [`SECURITY_MERGE_GATE.md`](SECURITY_MERGE_GATE.md): 79 items passing locally, CI link pending)**; M2 next; M2 documents + processing; M3 grounded chat; M4 summaries + quiz generation; M5 quiz taking, end-to-end demo, security verification. Quiz MVP (decided 2026-11-24): multiple choice + true/false, retry incorrect answers, auto-grading, citations; no short-answer, essay or adaptive exams. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
 - Housekeeping: keep this file current; push branch `post-eval-quality`; archive `evaluation/results/` outside the machine (git-ignored, checksummed).
 - Table retrieval quality and table spacer columns (known issues).
 
@@ -633,6 +644,7 @@ Detail: section 6 (corpus composition and coverage assessment), section 7 (table
 
 ## 13. Changelog of this file
 
+- **2026-11-24 M1 implemented**: new §3.13 (endpoints, password, token, refresh, lockout and ownership design; 80 gate tests); §3.12 records the green M0 CI run; §8 milestone line. Gate evidence table added to `SECURITY_MERGE_GATE.md`; `backend/README.md` endpoint table.
 - **2026-11-24 M1 security merge gate**: `docs/SECURITY_MERGE_GATE.md` added and linked from §8; M0 CI confirmed green on GitHub (run 1, commit `7892321`: secret scan, dependency audit, lint, types, tests).
 - **2026-11-24 M0 backend foundation**: new §3.12; §4 backend tree and environment versions (Pillow 13, SQLAlchemy, Alembic); §7 platform bullets (CI partly in place, backend foundation, version control); §8 milestone list and the approved quiz-MVP scope; tech-stack line updated. Contract: Appendix C (recorded dependency exceptions) and decided items (CORS, JWT, quiz scope).
 - **2026-11-24 backend security contract**: `docs/backend_security_contract.md` added (ownership, isolation, retrieval, vector-store and file-storage guarantees, JWT and refresh-token model, secrets, upload rules, security test matrix); §8 "In progress" and the related-documents list link it.

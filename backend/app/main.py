@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.v1 import router as v1_router
+from backend.app.core.clock import Clock, SystemClock
 from backend.app.core.config import Settings, get_settings
 from backend.app.core.errors import UnhandledErrorMiddleware, install_error_handlers
 from backend.app.core.logging import configure_logging
@@ -25,17 +26,26 @@ from backend.app.core.middleware import (
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
 )
+from backend.app.core.passwords import PasswordService
 from backend.app.core.ratelimit import InMemoryRateLimiter, RateLimiter
+from backend.app.core.tokens import TokenService
 from backend.app.db.session import create_db_engine, create_session_factory
 from backend.app.services.ai_container import AIContainer
+from backend.app.services.auth import AuthService
 
 
-def create_app(settings: Settings | None = None, *, rate_limiter: RateLimiter | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, *, rate_limiter: RateLimiter | None = None, clock: Clock | None = None
+) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.secret_values())
 
+    clock = clock or SystemClock()
+    limiter = rate_limiter or InMemoryRateLimiter(clock=clock.monotonic)
     engine = create_db_engine(settings.database_url)
     ai = AIContainer(settings)
+    passwords = PasswordService(settings)
+    auth = AuthService(settings, clock, passwords, TokenService(settings, clock), limiter)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -56,7 +66,9 @@ def create_app(settings: Settings | None = None, *, rate_limiter: RateLimiter | 
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
     app.state.ai = ai
-    app.state.rate_limiter = rate_limiter or InMemoryRateLimiter()
+    app.state.clock = clock
+    app.state.rate_limiter = limiter
+    app.state.auth = auth
 
     install_error_handlers(app)
     app.include_router(v1_router)

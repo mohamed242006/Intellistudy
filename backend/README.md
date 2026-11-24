@@ -9,8 +9,9 @@ RET-06, ...) are cited in code and tests.
 | Milestone | Scope | State |
 |---|---|---|
 | M0 | Foundations + security baseline: settings, logging with redaction, RFC 7807 errors, security headers, CORS allowlist, body limits, rate-limit scaffold, SQLAlchemy + Alembic, LLM provider interface (DeepSeek / OpenAI / local), AI service container, `/api/v1/health`, CI | done |
-| M1 | Identity, courses, ownership | next |
-| M2-M5 | Documents and processing, grounded chat, summaries + quiz generation, quiz taking + demo | planned |
+| M1 | Identity, courses, ownership: register/login/refresh/logout/logout-all/me/change-password, Argon2id, HS256 access tokens, rotating refresh tokens with reuse detection, lockout, rate limits, course CRUD through `get_owned`; release gate `docs/SECURITY_MERGE_GATE.md` (79 items, all passing) | done (CI on push) |
+| M2 | Documents and processing | next |
+| M3-M5 | Grounded chat, summaries + quiz generation, quiz taking + demo | planned |
 
 ## Run locally (demo profile)
 
@@ -27,6 +28,23 @@ uvicorn --factory backend.app.main:create_app --host 127.0.0.1 --port 8000
 ```
 
 Then open `http://127.0.0.1:8000/api/v1/health` or the interactive docs at `/docs` (disabled in `prod`).
+
+## Endpoints (M1)
+
+| Method and path | Auth | Notes |
+|---|---|---|
+| `POST /api/v1/auth/register` | - | 201 with the profile; 3 per hour per IP |
+| `POST /api/v1/auth/login` | - | access token in the body; refresh token only in the `__Secure-is_refresh` cookie (`HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`); 5 per minute per IP and per account; 15-minute lock after 5 failures |
+| `POST /api/v1/auth/refresh` | refresh cookie + `X-Requested-With: IntelliStudy` | rotates the refresh token; reuse of an old one revokes the whole session family |
+| `POST /api/v1/auth/logout` | refresh cookie + `X-Requested-With: IntelliStudy` | revokes this session family |
+| `POST /api/v1/auth/logout-all` | Bearer | revokes every session and every existing access token |
+| `POST /api/v1/auth/change-password` | Bearer | revokes everything, returns a fresh session |
+| `GET /api/v1/auth/me` | Bearer | own profile |
+| `POST/GET /api/v1/courses`, `GET/PATCH/DELETE /api/v1/courses/{id}` | Bearer | owner-scoped; another user's or a malformed id is the same 404 |
+
+Access tokens are accepted only in `Authorization: Bearer ...` (never query strings or cookies). The browser keeps
+the access token in memory and calls `refresh` when it expires (15 minutes). Over plain `http://localhost` browsers
+still store `Secure` cookies; other HTTP clients may not.
 
 ## Configuration
 
@@ -62,11 +80,14 @@ audit findings are recorded with reasons in the contract, Appendix C. Local hook
 backend/
   app/
     main.py              create_app() factory (no module-level app: importing reads no environment)
-    core/                config, logging (redaction, security events), errors (RFC 7807), middleware, ratelimit
+    core/                config, clock, passwords (Argon2id + policy), tokens (JWT), logging (redaction, security
+                         events), errors (RFC 7807), middleware, ratelimit
     db/                  base (portable types), session (SQLite pragmas), models, migrate
     providers/           LLMProvider interface; DeepSeek / OpenAI / Local (FutureLocalProvider) providers; factory
-    services/            ai_container (lazy embedder, reranker, stores, retrieval; the only module touching stores)
-    api/v1/              routers (M0: health)
+    services/            auth (sessions, lockout, revocation), ownership (get_owned), courses, ai_container (the only
+                         module touching stores)
+    api/v1/              routers: health, auth, courses; schemas (every request model forbids unknown fields)
   migrations/            Alembic environment and revisions
-  tests/                 unittest suites, incl. static architecture rules (test_static_rules.py)
+  tests/                 unittest suites: M0 tests, static architecture rules, and the M1 gate tests test_g1_*.py
+                         (one test per gate item; test_g1_m0.py checks the mapping stays one-to-one)
 ```

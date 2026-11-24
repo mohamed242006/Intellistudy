@@ -85,6 +85,18 @@ class Settings(BaseSettings):
     access_token_minutes: int = Field(default=15, ge=1, le=30)  # JWT-04
     refresh_idle_days: int = Field(default=7, ge=1, le=30)  # RT-03
     refresh_absolute_days: int = Field(default=30, ge=1, le=90)
+    jwt_leeway_seconds: int = Field(default=30, ge=0, le=30)  # JWT-03: at most 30 s
+
+    # Argon2id (JWT-10): minimums are the contract floor; defaults are stronger.
+    argon2_memory_kib: int = Field(default=65536, ge=19456)
+    argon2_time_cost: int = Field(default=3, ge=2)
+    argon2_parallelism: int = Field(default=1, ge=1, le=1)
+
+    # login protection (JWT-13) and password policy (JWT-11)
+    lockout_threshold: int = Field(default=5, ge=1)
+    lockout_minutes: int = Field(default=15, ge=1)
+    password_min_length: int = Field(default=10, ge=10)
+    password_max_length: int = Field(default=128, ge=10, le=1024)
 
     # --- uploads (used from M2) ------------------------------------------------------------------------------
     max_upload_bytes: int = Field(default=100 * 1024 * 1024, gt=0)  # UPL-02 (approved: 100 MB)

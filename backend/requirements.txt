@@ -6,6 +6,8 @@ fastapi
 uvicorn
 pydantic-settings>=2.4
 httpx>=0.27            # LLM provider client; also used by the test client
+argon2-cffi>=23.1      # Argon2id password hashing (contract JWT-10)
+pyjwt>=2.9             # access tokens, HS256 only (contract JWT-01)
 
 # Database (SQLite for the demo; PostgreSQL later with the same code)
 sqlalchemy>=2.0,<3
