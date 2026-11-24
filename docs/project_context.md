@@ -21,7 +21,8 @@ Related documents in `docs/`: `chunking_design_spec.md` (original chunking rules
 `chunking_architecture.md` (chunking code as first built), `embedding_retrieval_architecture.md`, `validation_progress.md`
 (validation log, closed 2026-10-18), `e2e_validation_report.md` (30-file run), `multimodal_ingestion_design.md` (figure design),
 `phase0_report.md` (E2E-07, E2E-10, figure Phase 0), `answer_layer.md` (answer layer MVP, E2E-08), `real_model_eval_plan.md` /
-`real_model_eval_report.md` (Qwen2.5-3B evaluation), `figma_ui_context.md` (UI source of truth), `IntelliStudy_Architecture_Design_v1.1.docx`
+`real_model_eval_report.md` (Qwen2.5-3B evaluation), `figma_ui_context.md` (UI source of truth),
+`backend_security_contract.md` (authoritative backend security reference, 2026-11-24), `IntelliStudy_Architecture_Design_v1.1.docx`
 (architecture design, Word). The four design documents named first carry a "superseded in part" banner listing what changed.
 
 ---
@@ -402,7 +403,7 @@ Platform
 15. Stronger-model run (2026-11-23): DeepSeek flash through the unchanged stack on the pinned retrieval cache, live policy A plus offline B1 / C replays, scored, root-caused and checksummed; evaluation milestone closed (section 11.2, `real_model_eval_report.md` section 11). Move to Linux with a pinned Python 3.12 environment the same day.
 
 ### In progress
-- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Backend planning starts next; its scope is not yet written down in this file. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
+- **Active priority (team decision recorded 2026-11-24): Backend Vertical Slice.** Security reference: [`backend_security_contract.md`](backend_security_contract.md) (authoritative for all backend work; rule ids cited in code and tests). The milestone plan (M0-M5) is not yet written down in this file. Equation extraction (item 16) and vision work (items 17-18) stay **parked**. The production-readiness items of section 12 (FW-1 to FW-5) are tracked there and do not block the backend, the frontend or the demo.
 - Housekeeping: keep this file current; push branch `post-eval-quality`; archive `evaluation/results/` outside the machine (git-ignored, checksummed).
 - Table retrieval quality and table spacer columns (known issues).
 
@@ -617,6 +618,7 @@ Detail: section 6 (corpus composition and coverage assessment), section 7 (table
 
 ## 13. Changelog of this file
 
+- **2026-11-24 backend security contract**: `docs/backend_security_contract.md` added (ownership, isolation, retrieval, vector-store and file-storage guarantees, JWT and refresh-token model, secrets, upload rules, security test matrix); §8 "In progress" and the related-documents list link it.
 - **2026-11-24 priorities and future-work register** (docs only): Backend Vertical Slice recorded as the active priority in §8 "In progress"; items 16-18 marked parked (FW-1, FW-2) without reordering §8; new §12 "Future Work (High Priority Before Production Deployment)" with FW-1 to FW-5; §10 points to it; changelog renumbered 12 -> 13; header updated.
 
 - **2026-11-23 post-evaluation quality pass** (branch `post-eval-quality`): §7 citation-parsing bullet marked fixed (list-aware parser, replay-measured), new bullet on the evaluation splitter; F-COV-3 re-diagnosed (document context, not timeline flattening); §8 items 15b and 15c; §10/§11.2 wording. `real_model_eval_report.md` sections 12 (parser fix) and 13 (F-COV-3).
