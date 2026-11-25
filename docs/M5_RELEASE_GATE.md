@@ -4,7 +4,9 @@
 and the release-level security verification of the contract, section 10.7). **Version 1.1, approved 2026-11-25:**
 decisions D5-1..D5-10 approved as written; D5-11 (submitted attempts are immutable) added by the team and enforced
 through the existing items G5-ATT-07, G5-ATT-08 and G5-RTY-01 (expected results made explicit; goals and item count
-unchanged). v1.0: draft.
+unchanged). v1.2 (2026-11-25, during implementation): G5-E2E-05 wording corrected to the approved M3 behaviour:
+without a provider, chat answers `refused` / `llm_unavailable` (M3 G3-ST-02, G3-PRV-01), not a 503; summary and quiz
+generation return 503 (M4 D-4). Goal unchanged. v1.0: draft.
 **M5 cannot be approved, merged or released unless every item below passes.**
 **Authority:** [`backend_security_contract.md`](backend_security_contract.md) v1.10 (rule ids such as `ISO-04`), the
 requirements in `IntelliStudy_Architecture_Design_v1.1.docx` (FR-EXM, NFR-PER, NFR-AVL), the M4 gate
@@ -193,11 +195,50 @@ over a mocked transport) and a fresh database and storage.
 | G5-E2E-02 | B runs the same flow at the same time with the **same PDF bytes**; every response body of both users is recorded | No response to B contains an id or document text of A's, and the reverse | ISO-06, ISO-08, R-03 |
 | G5-E2E-03 | Then A deletes one document, then the course | T-1..T-3 and D5-5 effects; after the course deletion no row, vector, parent or file of A's course remains in any store; A's ledger rows remain; B's data untouched | ISO-03, UPL-16, FR-CRS-03 |
 | G5-E2E-04 | The app is restarted mid-flow: an ingestion job, a quiz generation job and an attempt in progress | The jobs are recovered and finish; the attempt resumes with its saved answers | NFR-REL, FR-EXM-05 |
-| G5-E2E-05 | No model provider configured | Chat, summary and quiz generation return 503 `llm_unavailable`; stored summaries and quizzes are readable; taking, submitting and reading results of an existing quiz work | NFR-AVL-03, D-4 (M4) |
+| G5-E2E-05 | No model provider configured | Chat answers `refused` / `llm_unavailable` (M3); summary and quiz generation return 503 `llm_unavailable`; stored summaries and quizzes are readable; taking, submitting and reading results of an existing quiz work | NFR-AVL-03, D-4 (M4) |
 
-### 2.10 Evidence
+### 2.10 Evidence (local, 2026-11-25)
 
-*Filled in when M5 is implemented.*
+| Area | Tests | File | Result |
+|---|---|---|---|
+| 2.1 Attempt ownership isolation | G5-ATI-01..06 | `backend/tests/test_g5_attempts.py` | pass |
+| 2.2 Answer-key confidentiality | G5-KEY-01..06 | `backend/tests/test_g5_attempts.py` | pass |
+| 2.3 Attempt lifecycle | G5-ATT-01..10 | `backend/tests/test_g5_attempts.py` | pass |
+| 2.4 Grading and results | G5-GRD-01..08 | `backend/tests/test_g5_grading.py` | pass |
+| 2.5 Retry missed questions | G5-RTY-01..06 | `backend/tests/test_g5_grading.py` | pass |
+| 2.6 Quiz changes and deletion | G5-LIF-01..07 | `backend/tests/test_g5_lifecycle.py` | pass |
+| 2.7 Limits and input validation | G5-ABU-01..05 | `backend/tests/test_g5_lifecycle.py` | pass |
+| 2.8 Security release verification | G5-SEC-01..08 | `backend/tests/test_g5_security.py` | pass |
+| 2.9 End-to-end slice | G5-E2E-01..05 | `backend/tests/test_g5_e2e.py` | pass |
+| Traceability | 61 rows map one to one to `test_g5_*` | `backend/tests/test_g1_m0.py` | pass |
+
+- Whole suites: backend 402 tests OK, no skips (M1-M4 gates, M4.1 regressions and the ledger tests included);
+  `ai/` 800 tests OK (12 skipped, 1 expected failure; unchanged by M5); ruff clean; mypy clean (159 files). A run of
+  the `ai/` suite concurrently with the backend suite failed its CPU-timing test
+  (`tests/test_performance.py::test_cost_grows_roughly_linearly_with_input_size`); it passes when run alone.
+- M4 gate v1.3: G4-INJ-05 and G4-KEY-03 now expect the approved M5 attempt routes and grader (their M4 wording had
+  said "in M4"; the exclusions they protect are unchanged).
+- Timing (G5-GRD-07, in-process test client): answer save p95, submit and results all well inside 300 ms and 1 s.
+- Mutation checks (each control removed, the M5 gate run, the control restored):
+
+| Control removed | Gate tests that fail |
+|---|---|
+| ownership check on attempts | ATI-01, -02, -03, -05, LIF-03..06, SEC-03, SEC-04, E2E-03 |
+| a correctness field on the save response | KEY-01, KEY-02, KEY-05, SEC-07 |
+| status guard before saving | LIF-01 |
+| conditional claim when saving (a save racing a submission) | ATT-07 (after adding the race case: the status guard alone had masked it) |
+| submit returns the stored snapshot (instead of grading again) | ATT-07, ATT-08, ABU-01 |
+| expire in-progress attempts on regeneration | ATT-09, ATT-10, KEY-03, LIF-01, RTY-03 |
+| delete attempts on invalidation (T-3) | LIF-04, LIF-06, E2E-03 |
+| sources still `ready` at submission | LIF-06 |
+| retry checks the quiz generation | RTY-04 |
+| answer-save rate limit | ABU-01 |
+| no body on start, submit and retry | ABU-02, ABU-03 |
+
+- The explicit attempt deletion on T-2 and on quiz deletion is defence in depth: the foreign-key cascade removes the
+  attempts too, so removing it alone fails no test (the T-3 path, where the quiz row survives, proves it).
+- Findings F-M5-01..03 in the contract's Appendix D (F-M5-01, a stale identity map after the submission claim, fixed
+  during implementation).
 
 ---
 

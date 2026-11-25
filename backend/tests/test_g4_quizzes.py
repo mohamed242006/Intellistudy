@@ -330,7 +330,8 @@ class AnswerKeyTests(QuizCase):
             if "QuizAnswerKey" in names:
                 users.add(path.relative_to(ROOT).as_posix())
         self.assertEqual(users, {"backend/app/db/models.py", "backend/app/services/generation.py",
-                                 "backend/app/services/lifecycle.py"})
+                                 "backend/app/services/lifecycle.py",
+                                 "backend/app/services/attempts.py"})  # M5 grading reads it (G5-KEY-05)
         self.assertFalse(any(u.startswith("backend/app/api/") for u in users))
 
     def test_g4_key_04_logs_jobs_and_ledger_hold_no_key_material(self) -> None:

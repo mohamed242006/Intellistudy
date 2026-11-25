@@ -255,9 +255,16 @@ class InjectionTests(M4Case):
                 self.assertEqual(response.status_code, 422)
                 self.assertEqual(check({**mcq("S1", FACTS[0].split(". ")[0] + "."), "type": kind}), "type")
         self.assertEqual(self.jobs(), 0)
-        paths = " ".join(self.app.openapi()["paths"])
-        for word in ("attempt", "grade", "grading", "exam", "submit"):
-            self.assertNotIn(word, paths)
+        paths = set(self.app.openapi()["paths"])
+        # M5 added exactly the approved attempt routes (M5 gate D5-1; this item's v1.3 note); exams, adaptive tests and
+        # grading routes stay absent (T-6)
+        attempt_routes = {p for p in paths if "attempt" in p or "submit" in p}
+        self.assertEqual(attempt_routes, {
+            "/api/v1/quizzes/{quiz_id}/attempts", "/api/v1/attempts/{attempt_id}",
+            "/api/v1/attempts/{attempt_id}/answers/{question_id}", "/api/v1/attempts/{attempt_id}/submit",
+            "/api/v1/attempts/{attempt_id}/results", "/api/v1/attempts/{attempt_id}/retry-missed"})
+        for word in ("grade", "grading", "exam", "adaptive", "short_answer", "essay"):
+            self.assertFalse([p for p in paths if word in p], word)
 
 
 if __name__ == "__main__":

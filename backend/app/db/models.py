@@ -9,12 +9,15 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import JSON, Boolean, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base, Timestamps, UTCDateTime, UUIDPrimaryKey
 
 __all__ = [
+    "AttemptAnswer",
+    "AttemptResult",
+    "AttemptStatus",
     "Base",
     "ChatState",
     "Conversation",
@@ -29,6 +32,7 @@ __all__ = [
     "ProcessingJob",
     "Quiz",
     "QuizAnswerKey",
+    "QuizAttempt",
     "QuizQuestion",
     "QuizSource",
     "QuizStatus",
@@ -291,6 +295,8 @@ class Quiz(UUIDPrimaryKey, Timestamps, Base):
     question_types: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     generated_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    #: incremented by every regeneration; an attempt belongs to one generation (M5 gate D5-3)
+    generation: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class QuizSource(UUIDPrimaryKey, Base):
@@ -339,3 +345,84 @@ class QuizAnswerKey(UUIDPrimaryKey, Base):
     evidence: Mapped[str] = mapped_column(Text, nullable=False)
     source_chunk_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     source_document_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+
+
+# ------------------------------------------------------------------------------------------------ M5: attempts
+class AttemptStatus(StrEnum):
+    IN_PROGRESS = "in_progress"
+    SUBMITTED = "submitted"
+    EXPIRED = "expired"
+
+
+IN_PROGRESS_ONLY = text("status = 'in_progress'")
+
+
+class QuizAttempt(UUIDPrimaryKey, Timestamps, Base):
+    """One attempt at one generation of a quiz (M5 gate D5-2, D5-3). Deleted with its quiz or course (ISO-03, D5-5);
+    once ``submitted`` it is never modified (ISO-11, D5-11). At most one ``in_progress`` attempt per user and quiz."""
+
+    __tablename__ = "quiz_attempts"
+    __table_args__ = (
+        Index("ix_quiz_attempts_owner_id_quiz_id", "owner_id", "quiz_id"),
+        Index("uq_quiz_attempts_in_progress", "owner_id", "quiz_id", unique=True, sqlite_where=IN_PROGRESS_ONLY,
+              postgresql_where=IN_PROGRESS_ONLY),
+    )
+
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    course_id: Mapped[str] = mapped_column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    quiz_id: Mapped[str] = mapped_column(String(36), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
+    quiz_generation: Mapped[int] = mapped_column(Integer, nullable=False)
+    parent_attempt_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # retry-missed source
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default=AttemptStatus.IN_PROGRESS.value)
+    expired_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    question_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)  # in position order
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    submitted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_score: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class AttemptAnswer(UUIDPrimaryKey, Base):
+    """A saved answer. ``question_id`` is deliberately not a foreign key: regeneration deletes the questions but an
+    expired attempt keeps its answers (G5-LIF-01); the attempt's ``question_ids`` bound which ids are accepted."""
+
+    __tablename__ = "attempt_answers"
+    __table_args__ = (UniqueConstraint("attempt_id", "question_id", name="uq_attempt_answers_attempt_question"),)
+
+    attempt_id: Mapped[str] = mapped_column(String(36), ForeignKey("quiz_attempts.id", ondelete="CASCADE"),
+                                            nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    question_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    choice: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    value: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    saved_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class AttemptResult(UUIDPrimaryKey, Base):
+    """The graded snapshot of one question, written once at submission and never updated (D5-4, ISO-11). The only
+    place outside the answer-key table where a correct answer, rationale or evidence is stored (ISO-04)."""
+
+    __tablename__ = "attempt_results"
+    __table_args__ = (UniqueConstraint("attempt_id", "question_id", name="uq_attempt_results_attempt_question"),)
+
+    attempt_id: Mapped[str] = mapped_column(String(36), ForeignKey("quiz_attempts.id", ondelete="CASCADE"),
+                                            nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    question_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    type: Mapped[str] = mapped_column(String(16), nullable=False)
+    stem: Mapped[str] = mapped_column(Text, nullable=False)
+    options: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    topic: Mapped[str] = mapped_column(String(80), nullable=False)
+    difficulty: Mapped[str] = mapped_column(String(8), nullable=False)
+    cognitive_level: Mapped[str] = mapped_column(String(16), nullable=False)
+    answer_choice: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    answer_value: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    answered: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    correct_choice: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    correct_value: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    evidence: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)  # model text, shown as "generated" (D5-6)
+    rationale_chosen: Mapped[str | None] = mapped_column(Text, nullable=True)
+    citation: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)

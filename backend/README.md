@@ -13,7 +13,7 @@ RET-06, ...) are cited in code and tests.
 | M2 | Documents and processing: streaming upload, file validation, ZIP-bomb and encryption checks, ownership-safe storage, sandboxed parser process, job runner; gate M2 section (39 items) | done (CI green) |
 | M3 | Grounded chat: conversations, messages, READY-only scoped retrieval, citation validation, answer sanitising, chat states, provider failure handling, token budget; release gate `docs/M3_RELEASE_GATE.md` (52 items, all passing; F-M2-10 closed) | done (CI green) |
 | M4 | Summaries + quiz generation: stored per-document summaries (map batches, grounded citations), multiple-choice and true/false quizzes with deterministic validation, separate answer keys, background generation, deletion rules; release gate `docs/M4_RELEASE_GATE.md` (67 items, all passing locally) | done (CI on push) |
-| M5 | Quiz taking, end-to-end demo, security verification | planned |
+| M5 | Quiz taking: attempts with resume, deterministic grading, results with cited explanations, retry of missed questions, immutable submitted attempts; whole-API security verification (`docs/SECURITY_VERIFICATION.md`); end-to-end tests and demo runbook (`docs/DEMO_RUNBOOK.md`); release gate `docs/M5_RELEASE_GATE.md` (61 items) | built (CI on push; manual demo run pending) |
 
 ## Run locally (demo profile)
 
@@ -31,7 +31,7 @@ uvicorn --factory backend.app.main:create_app --host 127.0.0.1 --port 8000
 
 Then open `http://127.0.0.1:8000/api/v1/health` or the interactive docs at `/docs` (disabled in `prod`).
 
-## Endpoints (M1-M2)
+## Endpoints (M1-M5)
 
 | Method and path | Auth | Notes |
 |---|---|---|
@@ -53,7 +53,12 @@ Then open `http://127.0.0.1:8000/api/v1/health` or the interactive docs at `/doc
 | `GET /api/v1/documents/{id}/summary` | Bearer | the stored summary (`status` `ready` / `generating` / `failed`, `pending`, sections with `[n]` citations and page/slide ranges); 404 when none was requested |
 | `POST /api/v1/documents/{id}/summary` | Bearer | `{regenerate?}`; 200 with the stored summary, or 202 when a generation is queued; 409 if the document is not ready; 503 without a model provider |
 | `POST/GET /api/v1/courses/{id}/quizzes` | Bearer | create (`document_ids?` 1-20, `question_count` 5-30, `question_types` `mcq` / `true_false`, `title?`; 202) / list |
-| `GET/DELETE /api/v1/quizzes/{id}`, `POST /api/v1/quizzes/{id}/regenerate` | Bearer | questions show only `stem`, `options`, `topic`, `difficulty`, `cognitive_level`: never the answer, rationale or evidence. `status` `invalid` after a source document was deleted (regenerate it) |
+| `GET/DELETE /api/v1/quizzes/{id}`, `POST /api/v1/quizzes/{id}/regenerate` | Bearer | questions show only `stem`, `options`, `topic`, `difficulty`, `cognitive_level`: never the answer, rationale or evidence. `status` `invalid` after a source document was deleted (regenerate it). Regenerating expires attempts in progress |
+| `POST/GET /api/v1/quizzes/{id}/attempts` | Bearer | start (201) or resume the attempt in progress (200; one per quiz); list own attempts. No body. 30 starts / hour |
+| `GET /api/v1/attempts/{id}` | Bearer | in progress: questions and saved answers (never correctness); submitted: score and times; expired: reason |
+| `PUT /api/v1/attempts/{id}/answers/{question_id}` | Bearer | `{"choice": 0-3}` (multiple choice) or `{"value": true/false}`; saved at once; the response never says whether it is right. 600 / hour |
+| `POST /api/v1/attempts/{id}/submit`, `GET /api/v1/attempts/{id}/results` | Bearer | grading without a model call: score, percent, per-topic scores, time spent; per question the answer, correct answer, evidence quote, citation and the model's rationale (`explanation_source: generated`). Submitted attempts never change; submitting again returns the same results. 30 submissions / hour |
+| `POST /api/v1/attempts/{id}/retry-missed` | Bearer | 201: a new attempt over the questions answered wrongly or left unanswered (409 `nothing_to_retry`, `quiz_changed`, `attempt_in_progress`) |
 
 Access tokens are accepted only in `Authorization: Bearer ...` (never query strings or cookies). The browser keeps
 the access token in memory and calls `refresh` when it expires (15 minutes). Over plain `http://localhost` browsers

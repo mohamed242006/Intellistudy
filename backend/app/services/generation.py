@@ -42,7 +42,7 @@ from backend.app.db.models import (
 from backend.app.services import quizgen, summaries
 from backend.app.services.ai_container import AIContainer
 from backend.app.services.chat import SafeLLM
-from backend.app.services.lifecycle import clear_questions
+from backend.app.services.lifecycle import clear_questions, delete_attempts, expire_attempts
 from backend.app.services.ownership import get_owned
 from backend.app.services.retrieval import ScopedRetrieval, ready_document_ids
 from backend.app.services.sources import Section, SourceUnavailable, load_sections
@@ -176,6 +176,8 @@ class GenerationService:
         if not sources or ready_document_ids(session, user.id, quiz.course_id, within=set(sources)) != set(sources):
             raise ApiError(409, "A source document of this quiz is not ready.", code="document_not_ready")
         self._admit_quiz(session, user, quiz.course_id, sources, quiz.requested_count)
+        expire_attempts(session, quiz.id, "quiz_regenerated")  # M5 D5-3; submitted attempts untouched (D5-11)
+        quiz.generation += 1
         clear_questions(session, quiz.id)
         quiz.status, quiz.invalid_reason, quiz.error_code, quiz.notice = QuizStatus.GENERATING.value, None, None, None
         quiz.question_count = 0
@@ -221,6 +223,7 @@ class GenerationService:
 
     def delete_quiz(self, session: Session, user: User, quiz_id: str) -> None:
         quiz = get_owned(session, Quiz, quiz_id, user.id, resource="quiz")
+        delete_attempts(session, quiz.id)  # M5 D5-5
         session.delete(quiz)  # questions, answer keys, sources and jobs cascade
         session.commit()
 

@@ -40,6 +40,9 @@ LIMITS: dict[str, Limit] = {
     "chat:user": Limit("chat:user", 20, 60),
     "summary:user": Limit("summary:user", 10, 3600),
     "quiz:user": Limit("quiz:user", 5, 3600),
+    "attempt:start": Limit("attempt:start", 30, 3600),  # start and retry-missed (M5 D5-9)
+    "attempt:answer": Limit("attempt:answer", 600, 3600),
+    "attempt:submit": Limit("attempt:submit", 30, 3600),
 }
 
 

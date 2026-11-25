@@ -1,17 +1,21 @@
-"""Deletion rules for generated content (M4 gate T-1..T-3, contract ISO-03). Imports models only, so the document
-deletion path can call it without pulling in the generation stack."""
+"""Deletion rules for generated content (M4 gate T-1..T-3, M5 gate D5-3 / D5-5, contract ISO-03, ISO-11). Imports
+models only, so the document deletion path can call it without pulling in the generation stack."""
 
 from __future__ import annotations
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from backend.app.db.models import (
+    AttemptAnswer,
+    AttemptResult,
+    AttemptStatus,
     Document,
     GenerationJob,
     JobStatus,
     Quiz,
     QuizAnswerKey,
+    QuizAttempt,
     QuizQuestion,
     QuizSource,
     QuizStatus,
@@ -22,6 +26,24 @@ from backend.app.db.models import (
 def clear_questions(session: Session, quiz_id: str) -> None:
     session.execute(delete(QuizAnswerKey).where(QuizAnswerKey.quiz_id == quiz_id))
     session.execute(delete(QuizQuestion).where(QuizQuestion.quiz_id == quiz_id))
+
+
+def delete_attempts(session: Session, quiz_id: str) -> None:
+    """Every attempt of a quiz with its answers and result snapshots, submitted ones included (D5-5, ISO-03). Explicit
+    rather than left to the foreign-key cascade, so the rule holds whatever the database enforces."""
+    attempt_ids = select(QuizAttempt.id).where(QuizAttempt.quiz_id == quiz_id).scalar_subquery()
+    session.execute(delete(AttemptResult).where(AttemptResult.attempt_id.in_(attempt_ids)))
+    session.execute(delete(AttemptAnswer).where(AttemptAnswer.attempt_id.in_(attempt_ids)))
+    session.execute(delete(QuizAttempt).where(QuizAttempt.quiz_id == quiz_id))
+
+
+def expire_attempts(session: Session, quiz_id: str, reason: str) -> None:
+    """In-progress attempts of a quiz that is being regenerated can no longer be answered or graded (D5-3). Submitted
+    attempts are not touched (D5-11, ISO-11); their snapshots stay readable."""
+    session.execute(update(QuizAttempt).where(
+        QuizAttempt.quiz_id == quiz_id, QuizAttempt.status == AttemptStatus.IN_PROGRESS.value)
+        .values(status=AttemptStatus.EXPIRED.value, expired_reason=reason)
+        .execution_options(synchronize_session=False))
 
 
 def on_document_purged(session: Session, document: Document) -> None:
@@ -36,6 +58,7 @@ def on_document_purged(session: Session, document: Document) -> None:
         quiz = session.scalars(select(Quiz).where(Quiz.id == quiz_id)).one_or_none()
         if quiz is None:
             continue
+        delete_attempts(session, quiz_id)  # D5-5: snapshots may hold the deleted document's text
         if others is None:  # T-2: the quiz depended only on this document
             session.delete(quiz)
             continue

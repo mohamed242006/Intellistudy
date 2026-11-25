@@ -32,6 +32,7 @@ from backend.app.core.ratelimit import InMemoryRateLimiter, RateLimiter
 from backend.app.core.tokens import TokenService
 from backend.app.db.session import create_db_engine, create_session_factory
 from backend.app.services.ai_container import AIContainer
+from backend.app.services.attempts import AttemptService
 from backend.app.services.auth import AuthService
 from backend.app.services.chat import ChatService
 from backend.app.services.documents import DocumentService
@@ -66,6 +67,7 @@ def create_app(
     jobs = JobRunner(settings, session_factory, ai, storage, clock, **({"parser": parser} if parser else {}))
     generation_runner = GenerationRunner(settings, session_factory, ai, clock, ledger)
     generation = GenerationService(settings, ai, limiter, clock, ledger, generation_runner)
+    attempts = AttemptService(settings, ai, limiter, clock)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -98,6 +100,7 @@ def create_app(
     app.state.jobs = jobs
     app.state.generation = generation
     app.state.generation_runner = generation_runner
+    app.state.attempts = attempts
     app.state.ai = ai
     app.state.clock = clock
     app.state.rate_limiter = limiter
