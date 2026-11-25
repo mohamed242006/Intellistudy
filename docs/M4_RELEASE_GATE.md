@@ -4,6 +4,7 @@
 **M4 cannot be approved, merged or released unless every item below passes.** Version 1.2, 2026-11-24 (v1.0 written
 before M4 implementation; v1.1: G4-PRV-04 wording for blank replies, which F-M3-04 already makes provider failures;
 v1.2: M4.1, G4-QAV-02 wording for line-end word splits (F-M4-06), manual DeepSeek run recorded in section 2.12).
+**Status: approved 2026-11-25** (section 3).
 **Authority:** [`backend_security_contract.md`](backend_security_contract.md) v1.5 (rule ids such as `RET-09`), the
 requirements in `IntelliStudy_Architecture_Design_v1.1.docx` (FR-SUM, FR-QZ, NFR-AVL-03) and the team decisions in
 section 1.2. If this gate and the contract disagree, the contract wins and this file is corrected.
@@ -251,6 +252,7 @@ common sources" came from the sentence splitter ending a sentence at "U.S." (F-M
 | before M4.1 | 22 | 6 | evidence 10, second_correct_option 5, unsupported_answer 1 | 6 | 60% |
 | after M4.1, run 1 | 20 | 9 | second_correct_option 10, unsupported_answer 1, near_duplicate 1 (after validation) | 8 | 80% |
 | after M4.1, run 2 | 19 | 10 | second_correct_option 8, evidence 1 | 10 | 100% |
+| after M4.1, official `POST /quizzes/{id}/regenerate` on the server (owner's run, 2026-11-25) | 19 | 8 | second_correct_option 9, evidence 1, unsupported_answer 1 | 8 | 80% |
 
 - All 10 evidence drops before the patch were line-end splits; after it, one remains (the model printed the soft
   hyphen as "-": "TRI-POD"), and none of the 8 inspected `second_correct_option` drops was a faulty question: the
@@ -266,7 +268,12 @@ common sources" came from the sentence splitter ending a sentence at "U.S." (F-M
 
 M4 is approved only when the record that completes it (pull request, or this file while work stays on the branch) shows:
 
-- [ ] CI run link for the commit, all jobs green.
-- [ ] Every `test_g4_*` test passed, no skips (67 items), plus the traceability test; M1, M2 and M3 gates still passing.
-- [ ] G4-BUD-04 passing: deleting summaries and quizzes refunds nothing either (F-M3-05 itself was fixed before M4, contract v1.6).
-- [ ] Evidence: one manual DeepSeek run on real lecture files (one summary of a long PDF, one 10-question quiz): latency against NFR-PER-05 (10-question quiz under 45 s), share of generated questions dropped by validation and why, tokens used. Recorded without document content.
+- [x] CI run link for the commit, all jobs green: run #7, commit `c1ee771` (M4 + M4.1), https://github.com/mohamed242006/Intellistudy/actions/runs/45477496588 (jobs: lint, types, tests; dependency audit; secret scan). M4 itself (`cc8042e`) was green in run #6, https://github.com/mohamed242006/Intellistudy/actions/runs/45460008806. The work is on branch `post-eval-quality`; there is no pull request yet, so this file is the record.
+- [x] Every `test_g4_*` test passed, no skips (67 items), plus the traceability test; M1, M2 and M3 gates still passing (same run; 340 backend tests, including the 15 M4.1 regression tests).
+- [x] G4-BUD-04 passing: deleting summaries and quizzes refunds nothing either (same run).
+- [x] Evidence: manual DeepSeek run recorded in section 2.12, without document content. Quiz generation 18.5 s (NFR-PER-05: under 45 s); summary 11.6 s; tokens 15,807 (summary) and 19,808 (quiz); drop shares and reasons per run, including the official regeneration after M4.1 (8 of 10 questions, 11 of 19 generated questions dropped: 9 `second_correct_option`, 1 `evidence`, 1 `unsupported_answer`). *Deviation: the file was an 11-page journal article, not lecture slides; long-document latency and cost are extrapolated in section 2.12 and stay a demo risk.*
+
+**Verdict (2026-11-25): M4 approved.** F-M4-05 and F-M4-06 fixed in M4.1. Open, none blocking: F-M4-02 (lexical
+validation; the single-answer check now limits yield, raised only through the prompt), F-M4-03 (frontend renders model
+text as text), F-M4-04 (attempts on a regenerated or invalidated quiz: decided by the M5 gate, decisions D5-3..D5-5),
+F-M4-07 (soft hyphens at ingestion).
