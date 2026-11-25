@@ -1,10 +1,12 @@
 # M5 Release Gate: Quiz Taking, End-to-End Slice and Security Verification
 
 **Status:** release gate for backend milestone M5 (quiz attempts and automatic grading, the end-to-end vertical slice,
-and the release-level security verification of the contract, section 10.7). **Draft v1.0, 2026-11-25, awaiting team
-approval. No M5 code exists; implementation starts only after the decisions in section 1.3 are approved.**
+and the release-level security verification of the contract, section 10.7). **Version 1.1, approved 2026-11-25:**
+decisions D5-1..D5-10 approved as written; D5-11 (submitted attempts are immutable) added by the team and enforced
+through the existing items G5-ATT-07, G5-ATT-08 and G5-RTY-01 (expected results made explicit; goals and item count
+unchanged). v1.0: draft.
 **M5 cannot be approved, merged or released unless every item below passes.**
-**Authority:** [`backend_security_contract.md`](backend_security_contract.md) v1.9 (rule ids such as `ISO-04`), the
+**Authority:** [`backend_security_contract.md`](backend_security_contract.md) v1.10 (rule ids such as `ISO-04`), the
 requirements in `IntelliStudy_Architecture_Design_v1.1.docx` (FR-EXM, NFR-PER, NFR-AVL), the M4 gate
 ([`M4_RELEASE_GATE.md`](M4_RELEASE_GATE.md), team decisions T-1..T-6) and the team decisions in section 1.2. If this
 gate and the contract disagree, the contract wins and this file is corrected.
@@ -58,7 +60,7 @@ the source), the citation (document id, file name, page or slide label) and the 
 | Standing | No frontend, adaptive-learning or equation-extraction work in the backend slice. | owner instructions |
 | T-1..T-3 | Deleting a document deletes its summaries and its single-source quizzes; a multi-source quiz becomes `invalid` and its questions and keys are deleted. | M4 gate |
 
-### 1.3 Decisions proposed by this gate (to approve before implementation)
+### 1.3 Decisions of this gate (approved 2026-11-25)
 
 | # | Proposal | Reason |
 |---|---|---|
@@ -72,6 +74,7 @@ the source), the citation (document id, file name, page or slide label) and the 
 | D5-8 | Submitting with unanswered questions is allowed; they score 0 and appear as `unanswered` with the correct answer and explanation. | Students must be able to stop; FR-EXM-10 reports the score honestly. |
 | D5-9 | **Limits per user:** attempt start and retry 30 / hour, answer saves 600 / hour, submissions 30 / hour (contract 9a gains these rows). | Bounded writes; normal study never comes close. |
 | D5-10 | **The demo is API-level:** the end-to-end slice is proven through the HTTP API and the runbook; no frontend is built in M5. | Standing "no frontend" instruction. |
+| D5-11 | **Submitted attempts are immutable** (team addition). After submission no route may modify the attempt's answers, score, result snapshot or grading outcome. Submitting again returns the stored results without grading again; retry creates a separate attempt and leaves its parent unchanged; regeneration expires only in-progress attempts. Deletion (D5-5) removes an attempt; it never edits one. | Results are a record of what the student did; contract ISO-11. |
 
 **Fixture:** users A, B (STUDENT) and C (ADMIN), each with a course. A's course has a ready PDF and a ready PPTX
 processed through the real M2 pipeline (sandbox), a ready single-source quiz, a ready quiz over both documents, a
@@ -115,8 +118,8 @@ processed through the real M2 pipeline (sandbox), a ready single-source quiz, a 
 | G5-ATT-04 | A saves answers, overwrites one, then the app is restarted (new app instance over the same database) and A resumes | Every answer saved at once; the overwrite kept; all answers present after the restart | FR-EXM-05 |
 | G5-ATT-05 | Malformed answers: multiple choice with `choice` -1, 4, `true`, `"1"`, or with `value`; true/false with `choice` or a non-boolean `value`; both fields; unknown fields | 422; nothing saved | OWN-08, FR-EXM-07 |
 | G5-ATT-06 | A question id of the same quiz that is not in this attempt (a retry attempt), or of another quiz of A | 404; nothing saved | ISO-01 |
-| G5-ATT-07 | Save an answer after submission | 409 `attempt_submitted`; saved answers and results unchanged | FR-EXM-05 |
-| G5-ATT-08 | Submit twice in a row, and two submissions racing (threads) | Graded exactly once; both calls return the same results; one result snapshot set | D5-4 |
+| G5-ATT-07 | After submission, call every route that writes to an attempt: save an answer, submit again, retry-missed; then regenerate the quiz | Save: 409 `attempt_submitted`; submit: the stored results, not graded again; retry: a separate attempt. The submitted attempt's answers, score, grading outcome and result snapshot are identical before and after | FR-EXM-05, D5-11 |
+| G5-ATT-08 | Submit twice in a row, and two submissions racing (threads) | Graded exactly once; both calls return the same results; one result snapshot set | D5-4, D5-11 |
 | G5-ATT-09 | List attempts with several attempts in every status; `limit` and `offset` | Own attempts of that quiz only, newest first; `score` shown only for submitted ones; bounds as in M3/M4 lists | FR-DSH-05, OWN-07 |
 | G5-ATT-10 | `GET /attempts/{id}` for in-progress, submitted and expired attempts | In progress: questions and answers (2.2 rules); submitted: status, score and times (details at `/results`); expired: status and reason only | FR-EXM-05 |
 
@@ -137,7 +140,7 @@ processed through the real M2 pipeline (sandbox), a ready single-source quiz, a 
 
 | ID | Test case | Expected result | Rules / requirements |
 |---|---|---|---|
-| G5-RTY-01 | Retry a submitted attempt with k questions wrong or unanswered | 201; a new attempt over exactly those k questions in their original order; `parent_attempt_id` set | Quiz MVP |
+| G5-RTY-01 | Retry a submitted attempt with k questions wrong or unanswered | 201; a new attempt over exactly those k questions in their original order; `parent_attempt_id` set; the parent attempt's answers, score and results unchanged | Quiz MVP, D5-11 |
 | G5-RTY-02 | Retry an attempt with every question correct | 409 `nothing_to_retry`; no attempt | Quiz MVP |
 | G5-RTY-03 | Retry an in-progress or expired attempt | 409 `attempt_not_submitted` / `attempt_expired` | D5-3 |
 | G5-RTY-04 | Retry after the quiz was regenerated since the attempt | 409 `quiz_changed`; no attempt | D5-3 |
@@ -202,10 +205,10 @@ over a mocked transport) and a fresh database and storage.
 
 M5 is approved only when the record that completes it (pull request, or this file while work stays on the branch) shows:
 
-- [ ] Team approval of decisions D5-1..D5-10 (or the changes made to them) **before implementation**, and the contract
-      updated to match: 9a (attempt limits), ISO-03 (attempts deleted with their quiz, including on invalidation),
-      ISO-04 (keys only in the results snapshot of a submitted attempt), I-13 (attempt get and list routes), Appendix D
-      F-M4-04 closed.
+- [x] Team approval of decisions D5-1..D5-10 **before implementation** (2026-11-25, as written, plus D5-11), and the
+      contract updated to match (v1.10): 9a (attempt limits), ISO-03 (attempts deleted with their quiz, including on
+      invalidation), ISO-04 (keys only in the results snapshot of a submitted attempt), ISO-11 (submitted attempts
+      immutable), I-13 (attempt get and list routes); Appendix D F-M4-04 decided (closed when this gate passes).
 - [ ] CI run link for the commit, all jobs green (tests, lint and types, dependency audit, secret scan).
 - [ ] Every `test_g5_*` test passed, no skips (61 items), plus the traceability test; M1-M4 gates still passing.
 - [ ] `docs/SECURITY_VERIFICATION.md` complete: every contract 10.1-10.6 row mapped to passing tests (G5-SEC-01), the
