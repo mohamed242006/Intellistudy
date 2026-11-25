@@ -69,19 +69,37 @@ class Stack:
         return self.service.index(chunk_set.children, document_uid=uid, parents=chunk_set.parents)
 
     def state(self, uid: str = UID) -> dict:
-        """Complete, comparable snapshot of what is stored for one document."""
+        """Complete, comparable snapshot of what is stored for one document.
+
+        Records are read exactly, by id. They used to be listed through a similarity search with a huge ``k``, but
+        Chroma's HNSW search is approximate: after updates and deletes it can leave out a stored record (seen as an
+        intermittent CI failure, 7 of 8 records returned), which made equal indexes compare unequal.
+        """
         ids = self.store.list_ids(COLLECTION, document_uid=uid)
         vectors = self.store.get_embeddings(COLLECTION, list(ids))
-        probe = self.embedder.embed_query("w s0_0 section")
-        hits = self.store.query(COLLECTION, probe, user_id="u1", course_id="c1", k=100_000,
-                                filters={"document_uid": uid})
-        records = {h.id: (h.document, tuple(sorted(h.metadata.items()))) for h in hits}
         return {
             "ids": ids,
             "vectors": {k: tuple(round(x, 5) for x in v) for k, v in vectors.items()},
-            "records": records,
+            "records": self.records(list(ids)),
             "parents": self.parents.list_ids(document_uid=uid),
         }
+
+    def records(self, ids: list[str]) -> dict:
+        """Document text and metadata of each id, read exactly (converted as ``ChromaVectorStore.query`` does)."""
+        if self.kind == "memory":
+            bucket = self.store._data.get(COLLECTION, {})
+            return {i: (bucket[i].document, tuple(sorted(dict(bucket[i].metadata).items()))) for i in ids if i in bucket}
+        if not ids:
+            return {}
+        got = self.store._collection(COLLECTION).get(ids=ids, include=["documents", "metadatas"])
+        return {vid: (document or "", tuple(sorted(dict(meta or {}).items())))
+                for vid, document, meta in zip(got["ids"], got["documents"], got["metadatas"], strict=True)}
+
+    def searchable(self, uid: str = UID) -> set[str]:
+        """Ids a scoped search returns: always a subset of the stored ids (never a stale or foreign record)."""
+        probe = self.embedder.embed_query("w s0_0 section")
+        return {h.id for h in self.store.query(COLLECTION, probe, user_id="u1", course_id="c1", k=100_000,
+                                               filters={"document_uid": uid})}
 
 
 class ReingestionBase:
@@ -94,7 +112,11 @@ class ReingestionBase:
         # The in-memory stack is the reference implementation: it also proves Chroma behaves like it.
         fresh = Stack("memory", self)
         fresh.index(doc.chunk())
-        self.assertEqual(self.stack.state(), fresh.state(), msg or "incremental index differs from a fresh index")
+        state = self.stack.state()
+        self.assertEqual(state, fresh.state(), msg or "incremental index differs from a fresh index")
+        searchable = self.stack.searchable()
+        self.assertTrue(searchable)  # the document is found by search ...
+        self.assertLessEqual(searchable, set(state["ids"]))  # ... and search surfaces nothing stale or foreign
 
 
 class ScenarioTests(ReingestionBase):
