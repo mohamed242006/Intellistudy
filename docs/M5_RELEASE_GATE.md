@@ -240,6 +240,24 @@ over a mocked transport) and a fresh database and storage.
 - Findings F-M5-01..03 in the contract's Appendix D (F-M5-01, a stale identity map after the submission claim, fixed
   during implementation).
 
+### 2.11 Manual DeepSeek demo run (owner's run, 2026-11-25)
+
+Following [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md) on two real lecture files (a 44-page PDF and a 36-slide PPTX), one
+student, real DeepSeek provider, commit `6e87e7d`. Recorded without document content.
+
+| Measure | Target | Result |
+|---|---|---|
+| Processing (upload to `ready`, server timestamps) | NFR-PER-04: 50 text pages under 90 s | PDF, 44 pages: 10.4 s; PPTX, 36 slides: 20.0 s (processed after the PDF, queue wait included) |
+| Chat | cited answer from the student's own material | `partial`, 1 citation to the PDF (a placeholder question first was refused `not_relevant`, correctly) |
+| Summary | grounded, cited | `ready`, 21 sections; grounding removed 2 of 59 sentences |
+| Quiz generation | NFR-PER-05: 10 questions under 45 s | 18.1 s |
+| Quiz yield | 8 or more of 10 | 10 of 10; 19 generated, 9 dropped (`unsupported_answer` 6, `second_correct_option` 2, `near_duplicate` 1), 3 provider calls |
+| Answer save | NFR-PER-01: under 300 ms | 2-7 ms (10 saves) |
+| Submit and grading | NFR-PER-06: under 1 s | 10 ms |
+| Results | score, per-topic scores, time spent; cited explanation for every missed question | 8/10 (80%), 8 topics, 463 s; both missed questions with correct answer, evidence quote, page citation and rationale |
+| Retry missed | exactly the missed questions | 2 questions (positions 1 and 10); 2/2 after answering from the results |
+| Tokens | within the 200,000 daily budget | 28,315 in total: chat 1,156 (1 call), summary 9,055 (3 calls), quiz 18,104 (3 calls) |
+
 ---
 
 ## 3. Sign-off
@@ -257,7 +275,7 @@ M5 is approved only when the record that completes it (pull request, or this fil
       `ok`, no skips; the G5 tests contain no skip decorators).
 - [ ] `docs/SECURITY_VERIFICATION.md` complete: every contract 10.1-10.6 row mapped to passing tests (G5-SEC-01), the
       OWASP checklist without open items (G5-SEC-08), signed by the owner. This is the contract's release gate (10.7).
-- [ ] Evidence: one manual demo run with DeepSeek following `docs/DEMO_RUNBOOK.md` on real lecture files (upload to
+- [x] Evidence (section 2.11): one manual demo run with DeepSeek following `docs/DEMO_RUNBOOK.md` on real lecture files (upload to
       results and retry), recorded without document content: processing time (NFR-PER-04), quiz generation time
       (NFR-PER-05), answer-save and grading times (NFR-PER-01, -06), tokens used, quiz yield.
 - [ ] Open items recorded with an owner and a deadline, none blocking the demo (proposed in
