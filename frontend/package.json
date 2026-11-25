@@ -1,0 +1,58 @@
+{
+  "name": "intellistudy-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "api:schema": "python3 scripts/export_openapi.py lib/api/openapi.json && openapi-typescript lib/api/openapi.json -o lib/api/schema.d.ts",
+    "check:static": "vitest run tests/unit/static",
+    "tokens": "node scripts/generate-tokens.ts"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "5.9.2",
+    "@tanstack/react-query": "5.108.4",
+    "next": "15.5.29",
+    "react": "19.1.10",
+    "react-dom": "19.1.10",
+    "react-hook-form": "7.92.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.1",
+    "@eslint/eslintrc": "3.3.7",
+    "@playwright/test": "1.65.1",
+    "@tailwindcss/postcss": "4.3.5",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.13",
+    "@types/node": "24.19.4",
+    "@types/react": "19.1.17",
+    "@types/react-dom": "19.1.11",
+    "@vitejs/plugin-react": "6.3.0",
+    "axe-core": "4.14.1",
+    "eslint": "9.39.5",
+    "eslint-config-next": "15.5.29",
+    "jsdom": "26.1.0",
+    "openapi-typescript": "7.13.0",
+    "tailwindcss": "4.3.5",
+    "typescript": "5.9.3",
+    "vite": "8.3.8",
+    "vitest": "5.1.2"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.33"
+    }
+  }
+}

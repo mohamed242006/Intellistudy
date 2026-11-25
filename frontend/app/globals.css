@@ -1,0 +1,27 @@
+@import "tailwindcss";
+@import "../design-system/tokens/tokens.css";
+
+@layer base {
+  html,
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-fg);
+  }
+
+  /* Visible 2 px focus ring on everything focusable (UI §4.5); inputs draw their own inside ring. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
