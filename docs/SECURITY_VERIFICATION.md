@@ -149,8 +149,9 @@ added with its expected behaviour.
 
 ## 5. Release checks and sign-off
 
-- [ ] CI run on the release commit: all jobs green (tests, lint and types, dependency audit, secret scan), so every
-      test named in section 1 passed without skips.
-- [ ] G5-SEC-01..08 passing in that run.
+- [x] CI run on the release commit: all jobs green (tests, lint and types, dependency audit, secret scan), so every
+      test named in section 1 passed: run #9, commit `d990509`,
+      https://github.com/mohamed242006/Intellistudy/actions/runs/45595607886.
+- [x] G5-SEC-01..08 passing in that run.
 - [ ] Owner sign-off of sections 3 and 4 against the contract, including the residuals (F-M3-03, F-M4-02, F-M4-03,
       F-M5-02, F-M5-03).

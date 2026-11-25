@@ -250,13 +250,17 @@ M5 is approved only when the record that completes it (pull request, or this fil
       contract updated to match (v1.10): 9a (attempt limits), ISO-03 (attempts deleted with their quiz, including on
       invalidation), ISO-04 (keys only in the results snapshot of a submitted attempt), ISO-11 (submitted attempts
       immutable), I-13 (attempt get and list routes); Appendix D F-M4-04 decided (closed when this gate passes).
-- [ ] CI run link for the commit, all jobs green (tests, lint and types, dependency audit, secret scan).
-- [ ] Every `test_g5_*` test passed, no skips (61 items), plus the traceability test; M1-M4 gates still passing.
+- [x] CI run link for the commit, all jobs green (tests, lint and types, dependency audit, secret scan): run #9,
+      commit `d990509`, https://github.com/mohamed242006/Intellistudy/actions/runs/45595607886.
+- [x] Every `test_g5_*` test passed, no skips (61 items), plus the traceability test; M1-M4 gates still passing (run #9;
+      the CI log needs repository access, so the per-test record is a verbose local run of the same commit: 61 of 61
+      `ok`, no skips; the G5 tests contain no skip decorators).
 - [ ] `docs/SECURITY_VERIFICATION.md` complete: every contract 10.1-10.6 row mapped to passing tests (G5-SEC-01), the
       OWASP checklist without open items (G5-SEC-08), signed by the owner. This is the contract's release gate (10.7).
 - [ ] Evidence: one manual demo run with DeepSeek following `docs/DEMO_RUNBOOK.md` on real lecture files (upload to
       results and retry), recorded without document content: processing time (NFR-PER-04), quiz generation time
       (NFR-PER-05), answer-save and grading times (NFR-PER-01, -06), tokens used, quiz yield.
-- [ ] Open items recorded with an owner and a deadline, none blocking the demo: F-M4-07 (soft hyphens at ingestion);
+- [ ] Open items recorded with an owner and a deadline, none blocking the demo (proposed in
+      [`SECURITY_EXECUTIVE_SUMMARY.md`](SECURITY_EXECUTIVE_SUMMARY.md), awaiting team confirmation): F-M4-07 (soft hyphens at ingestion);
       the privacy notice for sending document content to DeepSeek (contract Appendix B, required before any non-team
       user uploads); the shared rate-limiter store before any multi-process deployment (contract 9a).
