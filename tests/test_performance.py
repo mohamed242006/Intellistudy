@@ -50,6 +50,13 @@ def timed(fn):
     return result, time.perf_counter() - start
 
 
+def cpu_timed(fn) -> float:
+    """CPU seconds of this process spent in ``fn`` (unaffected by other processes competing for the machine)."""
+    start = time.process_time()
+    fn()
+    return time.process_time() - start
+
+
 def big_blocks(total_words: int, section_words: int = 400):
     blocks, n = [], 0
     for s in range(total_words // section_words):
@@ -74,8 +81,10 @@ class ChunkingPerformance(unittest.TestCase):
         engine = ChunkingEngine(tokenizer=WordCounter())
         small, big = build(big_blocks(30_000)), build(big_blocks(120_000))
         engine.run(small, CTX)  # warm-up
-        _, t_small = timed(lambda: engine.run(small, CTX))
-        _, t_big = timed(lambda: engine.run(big, CTX))
+        # Best of three, in CPU time of this process: one wall-clock sample was at the mercy of a busy CI runner
+        # (failed CI run #10 on a docs-only commit). The threshold is unchanged; quadratic growth still shows ~16x.
+        t_small = min(cpu_timed(lambda: engine.run(small, CTX)) for _ in range(3))
+        t_big = min(cpu_timed(lambda: engine.run(big, CTX)) for _ in range(3))
         ratio = t_big / max(t_small, 1e-3)
         TIMINGS["chunk scaling 4x input"] = f"{ratio:.1f}x time ({t_small:.2f}s -> {t_big:.2f}s)"
 
