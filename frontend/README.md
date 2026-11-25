@@ -2,10 +2,18 @@
 
 Next.js 15 (App Router), TypeScript (strict), Tailwind CSS v4, TanStack Query, React Hook Form, Zod.
 Visual source of truth: [`../docs/figma_ui_context.md`](../docs/figma_ui_context.md). Plan and gates:
-[`../docs/FRONTEND_IMPLEMENTATION_PLAN.md`](../docs/FRONTEND_IMPLEMENTATION_PLAN.md), [`../docs/F0A_GATE.md`](../docs/F0A_GATE.md).
+[`../docs/FRONTEND_IMPLEMENTATION_PLAN.md`](../docs/FRONTEND_IMPLEMENTATION_PLAN.md), [`../docs/F0A_GATE.md`](../docs/F0A_GATE.md),
+[`../docs/F0B_GATE.md`](../docs/F0B_GATE.md).
 
-**Status:** F0-A, foundations and secure authentication (Sign in, Sign up, session, route protection). The landing
-route `/` is an F0-A integration placeholder, not the Dashboard.
+**Status:** F0-A (foundations, Sign in, Sign up, session, route protection) and F0-B (Dashboard, courses, Course
+Workspace, uploads with processing status, retry, download and deletion).
+
+| Route | Screen |
+|---|---|
+| `/signin`, `/signup` | authentication |
+| `/` | Dashboard ("Your courses" at `/#courses`; `/courses` redirects there) |
+| `/courses/[courseId]` | Course Workspace (`?file=` selects a file) |
+| `/courses/[courseId]/upload` | Upload flow |
 
 ## Run
 
@@ -20,6 +28,9 @@ npm run dev            # http://localhost:3000  (use "localhost", which is in th
 
 `/api/v1/*` is rewritten to the backend (same origin), so the refresh cookie and CSRF header work.
 Set `INTELLISTUDY_API_ORIGIN` (server-side only, see `.env.example`) to point at another backend.
+**It is read when the app is built:** `next build` writes the rewrite target into `.next/`, so a production build made
+without it talks to `http://127.0.0.1:8000` whatever `next start` is given. Set it for `next build`, not only for
+`next start`.
 
 ## Checks
 
@@ -29,10 +40,14 @@ npx playwright install chromium && npm run e2e     # starts its own backend (por
 ```
 
 The end-to-end suite starts a throwaway backend with `scripts/e2e-backend.sh`:
-- a fresh SQLite database in a temporary directory, never `data/backend/`;
+- a fresh SQLite database and file storage in a temporary directory, never `data/backend/`;
 - it never reads `.env`;
 - no LLM provider;
+- the processing worker on (since F0-B), so uploads reach real terminal states with the real embedding model;
 - the real rate limits.
+
+Upload fixtures (PDF, PPTX, DOCX, an empty PDF and a damaged PDF) are generated into a temporary directory by
+`tests/e2e/fixtures/make_fixtures.py`; `data/uploads/` is never used.
 
 It uses the repository's `.venv` Python when present; set `E2E_PYTHON` to choose another interpreter.
 
@@ -54,3 +69,5 @@ Tests fail when either drifts from its source.
   stylesheet.
 - **Icons:** the 30 Figma icons are placeholders until they are exported
   (`design-system/icons/placeholders.ts`).
+- **Server state:** TanStack Query only, with the keys in `lib/query/keys.ts`; no other global store. Uploads use one
+  `XMLHttpRequest` per file (`lib/api/upload.ts`) for progress; everything else goes through `lib/api/client.ts`.

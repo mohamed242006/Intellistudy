@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Start a throwaway FastAPI backend for the Playwright suite (gate GF0A-14..22).
-# - Fresh SQLite database and storage in a temporary directory; nothing touches data/backend/.
+# Start a throwaway FastAPI backend for the Playwright suite (gates GF0A-14..22, GF0B-*).
+# - Fresh SQLite database and storage in a temporary directory; nothing touches data/backend/ or data/uploads/.
 # - Started from that directory, so the repository's .env (secrets, provider keys) is never read; every setting is
-#   given here. Throwaway JWT secret, no LLM provider, background workers off.
+#   given here. Throwaway JWT secret, no LLM provider.
+# - The document-processing worker is on (F0-B: uploads must reach real terminal states); E2E_WORKER_ENABLED=false
+#   turns it off.
 # - Rate limits are the real ones (no test switch exists); the suite stays within them.
 # Usage: scripts/e2e-backend.sh  (E2E_PYTHON=/path/to/python to choose the interpreter)
 set -euo pipefail
@@ -23,7 +25,7 @@ export INTELLISTUDY_LLM_PROVIDER=none
 export INTELLISTUDY_DATABASE_URL="sqlite:///$WORK/e2e.sqlite3"
 export INTELLISTUDY_DATA_DIR="$WORK"
 export INTELLISTUDY_STORAGE_ROOT="$WORK/storage"
-export INTELLISTUDY_WORKER_ENABLED=false
+export INTELLISTUDY_WORKER_ENABLED="${E2E_WORKER_ENABLED:-true}"
 export INTELLISTUDY_CORS_ORIGINS="${E2E_FRONTEND_ORIGIN:-http://localhost:3100}"
 
 cd "$WORK"

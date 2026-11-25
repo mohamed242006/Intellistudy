@@ -2,7 +2,8 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProtectedLayout from "@/app/(app)/layout";
-import LandingPage from "@/app/(app)/page";
+import SidebarLayout from "@/app/(app)/(sidebar)/layout";
+import DashboardPage from "@/app/(app)/(sidebar)/page";
 import AuthLayout from "@/app/(auth)/layout";
 import SignInPage from "@/app/(auth)/signin/page";
 import SignUpPage from "@/app/(auth)/signup/page";
@@ -30,11 +31,16 @@ const signUp = () => (
     <SignUpPage />
   </AuthLayout>
 );
-const protectedPlaceholder = () => (
+/** The protected landing route: since F0-B the Dashboard (docs/F0B_GATE.md section 6). */
+const protectedLanding = () => (
   <ProtectedLayout>
-    <LandingPage />
+    <SidebarLayout>
+      <DashboardPage />
+    </SidebarLayout>
   </ProtectedLayout>
 );
+const NO_COURSES = () => json(200, { items: [], limit: 50, offset: 0 });
+const accountButton = () => screen.findAllByRole("button", { name: /^Account: Test Student/ }).then((all) => all[0]!);
 
 beforeEach(() => {
   tokenStore.clear();
@@ -50,9 +56,9 @@ async function fillSignIn(email: string, password: string) {
 describe("GF0A-17 startup", () => {
   it("GF0A-17 makes exactly one refresh at startup (StrictMode) and restores the session", async () => {
     nav.reset("/");
-    const backend = fakeBackend().on("POST /auth/refresh", () => json(200, TOKEN())).on("GET /auth/me", () => json(200, USER));
-    renderWithProviders(protectedPlaceholder());
-    expect(await screen.findByTestId("signed-in-user")).toHaveTextContent("Test Student (student@example.org)");
+    const backend = fakeBackend().on("POST /auth/refresh", () => json(200, TOKEN())).on("GET /auth/me", () => json(200, USER)).on("GET /courses", NO_COURSES);
+    renderWithProviders(protectedLanding());
+    expect(await accountButton()).toHaveTextContent("Test Studentstudent@example.org");
     expect(backend.count("POST /auth/refresh")).toBe(1);
   });
 
@@ -69,9 +75,9 @@ describe("GF0A-18 route protection", () => {
   it("GF0A-18 sends an anonymous visitor to /signin with a same-origin return path", async () => {
     nav.reset("/");
     fakeBackend().on("POST /auth/refresh", () => problem(401, "session_invalid"));
-    renderWithProviders(protectedPlaceholder());
+    renderWithProviders(protectedLanding());
     await waitFor(() => expect(nav.replace).toHaveBeenCalledWith("/signin?next=%2F"));
-    expect(screen.queryByTestId("signed-in-user")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Account:/ })).toBeNull();
   });
 
   it("GF0A-18 sends a signed-in visitor of an auth page to a safe return path, never another origin", async () => {
@@ -82,14 +88,15 @@ describe("GF0A-18 route protection", () => {
   });
 });
 
-describe("GF0A-19 protected placeholder", () => {
-  it("GF0A-19 is labelled as an F0-A integration placeholder, not the Dashboard", async () => {
+describe("GF0A-19 protected landing route", () => {
+  it("GF0A-19 the protected landing route (F0-B Dashboard) shows the signed-in user and offers Sign out", async () => {
     nav.reset("/");
-    fakeBackend().on("POST /auth/refresh", () => json(200, TOKEN())).on("GET /auth/me", () => json(200, USER));
-    renderWithProviders(protectedPlaceholder());
-    expect(await screen.findByRole("heading", { level: 1, name: "F0-A integration placeholder" })).toBeVisible();
-    expect(screen.getByText(/It is not the Dashboard/)).toBeVisible();
-    expect(screen.queryByText(/mastery|streak|Good afternoon/i)).toBeNull();
+    fakeBackend().on("POST /auth/refresh", () => json(200, TOKEN())).on("GET /auth/me", () => json(200, USER)).on("GET /courses", NO_COURSES);
+    renderWithProviders(protectedLanding());
+    expect(await screen.findByRole("heading", { level: 1, name: /, Test$/ })).toBeVisible();
+    await userEvent.click(await accountButton());
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeVisible();
+    expect(screen.queryByText(/mastery|streak|recommended|weakest|recent activity/i)).toBeNull();
   });
 });
 
@@ -201,16 +208,19 @@ describe("GF0A-12 logout", () => {
     const backend = fakeBackend()
       .on("POST /auth/refresh", () => json(200, TOKEN()))
       .on("GET /auth/me", () => json(200, USER))
+      .on("GET /courses", NO_COURSES)
       .on("POST /auth/logout", () => new Response(null, { status: 204 }));
-    const { queryClient } = renderWithProviders(protectedPlaceholder());
-    queryClient.setQueryData(["courses"], [{ id: "c-1" }]);
-    await userEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+    const { queryClient } = renderWithProviders(protectedLanding());
+    queryClient.setQueryData(["course", "c-1"], { id: "c-1" });
+    await userEvent.click(await accountButton());
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
     await waitFor(() => expect(nav.replace).toHaveBeenCalledWith("/signin?next=%2F"));
     const logout = backend.calls.find((c) => c.path === "/auth/logout")!;
     expect(logout.headers["X-Requested-With"]).toBe("IntelliStudy");
     expect(logout.headers.Authorization).toBeUndefined();
     expect(logout.credentials).toBe("same-origin");
     expect(tokenStore.get()).toBeNull();
-    expect(queryClient.getQueryData(["courses"])).toBeUndefined();
+    expect(queryClient.getQueryData(["course", "c-1"])).toBeUndefined();
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
   });
 });

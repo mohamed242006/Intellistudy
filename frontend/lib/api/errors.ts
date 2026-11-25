@@ -13,6 +13,10 @@ export type ApiErrorKind =
   | "forbidden" // 403 (for example csrf_rejected)
   | "rate_limited" // 429, with Retry-After when the backend sent it
   | "not_found"
+  | "conflict" // 409 other than registration_rejected (for example not_failed)
+  | "too_large" // 413 file_too_large, quota_exceeded
+  | "unsupported_media" // 415
+  | "bad_request" // 400 (for example malformed_upload)
   | "network" // no response at all
   | "server" // 5xx
   | "unknown";
@@ -27,6 +31,9 @@ const FIELD_OF_CODE: Record<string, "email" | "name" | "password"> = {
 /** Codes whose `detail` is a fixed, client-safe sentence written by the backend for the user. */
 const SHOWABLE_DETAIL = new Set(["invalid_email", "invalid_name", "weak_password"]);
 
+/** One rejected file of a 422 `upload_rejected` problem (backend/app/services/documents.py, contract UPL-13). */
+export type FileProblem = { file: string; reason: string };
+
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status: number;
@@ -34,6 +41,8 @@ export class ApiError extends Error {
   readonly field: "email" | "name" | "password" | null;
   readonly userMessage: string | null; // backend sentence safe to show, or null (the UI uses its own copy)
   readonly retryAfterSeconds: number | null;
+  /** Per-file reasons of an `upload_rejected` problem (reason codes only; the UI writes its own sentences). */
+  readonly files: readonly FileProblem[];
 
   constructor(init: {
     kind: ApiErrorKind;
@@ -42,6 +51,7 @@ export class ApiError extends Error {
     field?: "email" | "name" | "password" | null;
     userMessage?: string | null;
     retryAfterSeconds?: number | null;
+    files?: readonly FileProblem[];
   }) {
     super(init.code || init.kind);
     this.name = "ApiError";
@@ -51,6 +61,7 @@ export class ApiError extends Error {
     this.field = init.field ?? null;
     this.userMessage = init.userMessage ?? null;
     this.retryAfterSeconds = init.retryAfterSeconds ?? null;
+    this.files = init.files ?? [];
   }
 }
 
@@ -58,36 +69,67 @@ function codeOf(type: unknown): string {
   return typeof type === "string" && type.startsWith("about:blank#") ? type.slice("about:blank#".length) : "";
 }
 
-function retryAfter(headers: Headers): number | null {
-  const raw = headers.get("retry-after");
+function retryAfter(raw: string | null): number | null {
   if (raw === null || !/^\d{1,6}$/.test(raw.trim())) return null;
   return Number(raw.trim());
 }
 
-/** Build an ApiError from a non-2xx response without trusting its body. */
-export async function apiErrorFrom(response: Response, context: { login?: boolean } = {}): Promise<ApiError> {
-  let body: Record<string, unknown> = {};
-  try {
-    const parsed: unknown = await response.json();
-    if (parsed && typeof parsed === "object") body = parsed as Record<string, unknown>;
-  } catch {
-    // not JSON: fall back on the status alone
-  }
-  const status = response.status;
+const REASON_CODE = /^[a-z_]{1,40}$/;
+
+/** Only well-formed reason codes and bounded names are kept from `files`; anything else in the body is ignored. */
+function fileProblems(raw: unknown): FileProblem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 10).flatMap((item: unknown) => {
+    if (!item || typeof item !== "object") return [];
+    const { file, reason } = item as Record<string, unknown>;
+    if (typeof reason !== "string" || !REASON_CODE.test(reason)) return [];
+    return [{ file: typeof file === "string" ? file.slice(0, 255) : "", reason }];
+  });
+}
+
+/** Build an ApiError from a status, a parsed problem body and the Retry-After header, without trusting the body. */
+export function apiErrorFromBody(
+  status: number,
+  parsed: unknown,
+  retryAfterHeader: string | null,
+  context: { login?: boolean } = {},
+): ApiError {
+  const body: Record<string, unknown> = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
   const code = codeOf(body.type);
   const detail = typeof body.detail === "string" && SHOWABLE_DETAIL.has(code) ? body.detail : null;
-  const base = { status, code, retryAfterSeconds: retryAfter(response.headers) };
+  const base = { status, code, retryAfterSeconds: retryAfter(retryAfterHeader) };
 
   if (status === 429) return new ApiError({ ...base, kind: "rate_limited" });
   if (status === 401) return new ApiError({ ...base, kind: context.login ? "invalid_credentials" : "unauthorized" });
   if (status === 409 && code === "registration_rejected") return new ApiError({ ...base, kind: "registration_rejected" });
+  if (status === 409) return new ApiError({ ...base, kind: "conflict" });
   if (status === 422) {
-    return new ApiError({ ...base, kind: "validation", field: FIELD_OF_CODE[code] ?? null, userMessage: detail });
+    return new ApiError({
+      ...base,
+      kind: "validation",
+      field: FIELD_OF_CODE[code] ?? null,
+      userMessage: detail,
+      files: code === "upload_rejected" ? fileProblems(body.files) : [],
+    });
   }
+  if (status === 413) return new ApiError({ ...base, kind: "too_large" });
+  if (status === 415) return new ApiError({ ...base, kind: "unsupported_media" });
+  if (status === 400) return new ApiError({ ...base, kind: "bad_request" });
   if (status === 403) return new ApiError({ ...base, kind: "forbidden" });
   if (status === 404) return new ApiError({ ...base, kind: "not_found" });
   if (status >= 500) return new ApiError({ ...base, kind: "server" });
   return new ApiError({ ...base, kind: "unknown" });
+}
+
+/** Build an ApiError from a non-2xx response without trusting its body. */
+export async function apiErrorFrom(response: Response, context: { login?: boolean } = {}): Promise<ApiError> {
+  let parsed: unknown = null;
+  try {
+    parsed = await response.json();
+  } catch {
+    // not JSON: fall back on the status alone
+  }
+  return apiErrorFromBody(response.status, parsed, response.headers.get("retry-after"), context);
 }
 
 export function networkError(): ApiError {

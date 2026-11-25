@@ -42,8 +42,13 @@ function endSession(): void {
   for (const listener of expiryListeners) listener();
 }
 
-async function send(path: string, options: RequestOptions): Promise<Response> {
-  const headers: Record<string, string> = { Accept: "application/json" };
+/** Ends the session after a failed refresh; used by transports that do not go through apiRequest (upload.ts). */
+export function expireSession(): void {
+  endSession();
+}
+
+async function send(path: string, options: RequestOptions, accept = "application/json"): Promise<Response> {
+  const headers: Record<string, string> = { Accept: accept };
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
   const token = options.auth === false ? null : tokenStore.get();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -86,6 +91,55 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     throw sessionExpiredError();
   }
   throw await apiErrorFrom(retried);
+}
+
+/** Run a protected request with the one-refresh-one-retry rule and return the raw successful Response. */
+async function sendWithRefresh(path: string, options: RequestOptions, accept: string): Promise<Response> {
+  const response = await send(path, options, accept);
+  if (response.ok) return response;
+  if (response.status !== 401) throw await apiErrorFrom(response);
+  const refreshed = await refreshSession();
+  if (!refreshed) {
+    endSession();
+    throw sessionExpiredError();
+  }
+  const retried = await send(path, options, accept);
+  if (retried.ok) return retried;
+  if (retried.status === 401) {
+    endSession();
+    throw sessionExpiredError();
+  }
+  throw await apiErrorFrom(retried);
+}
+
+/**
+ * The file name of an `attachment` Content-Disposition (RFC 6266 `filename*=UTF-8''…`, as the backend sends it), or
+ * null. The name is used only as the `download` attribute of a programmatic anchor, never as markup or a path.
+ */
+export function attachmentFileName(header: string | null): string | null {
+  if (!header || !/^\s*attachment\b/i.test(header)) return null;
+  const match = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(header);
+  if (!match?.[1]) return null;
+  try {
+    const name = decodeURIComponent(match[1].trim());
+    return name.replace(/[\\/]/g, "_").slice(0, 255) || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Download a protected file as a Blob (GF0B-22). Only `attachment` responses are accepted. */
+export async function apiDownload(path: string, signal?: AbortSignal): Promise<{ blob: Blob; fileName: string | null }> {
+  const response = await sendWithRefresh(path, { signal }, "*/*");
+  const disposition = response.headers.get("content-disposition");
+  if (!disposition || !/^\s*attachment\b/i.test(disposition)) throw new ApiError({ kind: "unknown", status: response.status });
+  return { blob: await response.blob(), fileName: attachmentFileName(disposition) };
+}
+
+/** Query string from defined values only (numbers and booleans); ids never travel in query strings. */
+export function query(params: Record<string, number | boolean | undefined>): string {
+  const entries = Object.entries(params).filter((entry): entry is [string, number | boolean] => entry[1] !== undefined);
+  return entries.length ? `?${entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")}` : "";
 }
 
 export { ApiError };

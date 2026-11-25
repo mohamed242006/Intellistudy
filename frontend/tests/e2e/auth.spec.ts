@@ -79,15 +79,15 @@ test("GF0A-22 accessibility: axe, keyboard order, visible focus, no overflow at 
   }
 });
 
-test("GF0A-16 GF0A-19 GF0A-07 sign up lands on the protected placeholder with nothing in web storage", async ({ page }) => {
+test("GF0A-16 GF0A-19 GF0A-07 sign up lands on the protected landing route (F0-B Dashboard) with nothing in web storage", async ({ page }) => {
   await page.goto("/signup");
   await page.getByLabel("Full name").fill(name);
   await page.getByLabel("University email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL("/");
-  await expect(page.getByRole("heading", { level: 1, name: "F0-A integration placeholder" })).toBeVisible();
-  await expect(page.getByTestId("signed-in-user")).toHaveText(`${name} (${email})`);
+  await expect(page.getByRole("heading", { level: 1, name: /, End$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: `Account: ${name}` })).toContainText(email);
   expect(await webStorageIsEmpty(page)).toBe(true);
   expect(await seriousViolations(page)).toEqual([]);
 });
@@ -97,16 +97,17 @@ test("GF0A-14 GF0A-17 GF0A-18 sign in, reload restores the session through the r
   await page.getByLabel("University email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByTestId("signed-in-user")).toBeVisible();
+  await expect(page.getByRole("button", { name: `Account: ${name}` })).toBeVisible();
   await page.reload();
-  await expect(page.getByTestId("signed-in-user")).toHaveText(`${name} (${email})`);
+  await expect(page.getByRole("button", { name: `Account: ${name}` })).toContainText(email);
   const cookies = await page.context().cookies();
   const refresh = cookies.find((c) => c.name === "__Secure-is_refresh");
   expect(refresh?.httpOnly).toBe(true);
   expect(refresh?.path).toBe("/api/v1/auth");
   expect(await webStorageIsEmpty(page)).toBe(true);
 
-  // GF0A-18: after sign-out, the protected route sends the visitor to /signin with a return path.
+  // GF0A-18: after sign-out (in the account menu since F0-B), the protected route sends the visitor to /signin.
+  await page.getByRole("button", { name: `Account: ${name}` }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/signin/);
   await page.goto("/");

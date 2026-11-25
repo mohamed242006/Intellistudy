@@ -4,9 +4,9 @@
  */
 import { vi } from "vitest";
 
-export type Call = { method: string; path: string; headers: Record<string, string>; body: unknown; credentials: RequestCredentials | undefined };
+export type Call = { method: string; path: string; search?: string; headers: Record<string, string>; body: unknown; credentials: RequestCredentials | undefined };
 
-type Reply = () => Response | Promise<Response>;
+type Reply = (url: URL, init: RequestInit) => Response | Promise<Response>;
 
 export function problem(status: number, code: string, detail?: string, headers: Record<string, string> = {}): Response {
   const body: Record<string, unknown> = { type: `about:blank#${code}`, title: "x", status, request_id: "r" };
@@ -23,17 +23,18 @@ export const USER = { id: "u-1", email: "student@example.org", name: "Test Stude
 
 export function fakeBackend() {
   const queues = new Map<string, Reply[]>();
+  const patterns: [RegExp, Reply][] = [];
   const calls: Call[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = new URL(String(input), "http://localhost");
     const method = (init.method ?? "GET").toUpperCase();
     const key = `${method} ${url.pathname.replace(/^\/api\/v1/, "")}`;
     const headers = Object.fromEntries(Object.entries((init.headers ?? {}) as Record<string, string>));
-    calls.push({ method, path: key.split(" ")[1] ?? "", headers, body: init.body ? JSON.parse(String(init.body)) : undefined, credentials: init.credentials });
+    calls.push({ method, path: key.split(" ")[1] ?? "", search: url.search, headers, body: init.body ? JSON.parse(String(init.body)) : undefined, credentials: init.credentials });
     const queue = queues.get(key);
-    const reply = queue && queue.length > 1 ? queue.shift() : queue?.[0];
+    const reply = (queue && queue.length > 1 ? queue.shift() : queue?.[0]) ?? patterns.find(([re]) => re.test(key))?.[1];
     if (!reply) throw new Error(`unexpected request ${key}`);
-    return reply();
+    return reply(url, init);
   });
   vi.stubGlobal("fetch", fetchMock);
   return {
@@ -42,6 +43,11 @@ export function fakeBackend() {
     /** Queue replies for "METHOD /path"; the last one repeats. */
     on(key: string, ...replies: Reply[]) {
       queues.set(key, replies);
+      return this;
+    },
+    /** Fallback reply for every "METHOD /path" matching the pattern (exact keys win). */
+    match(pattern: RegExp, reply: Reply) {
+      patterns.push([pattern, reply]);
       return this;
     },
     count(key: string) {

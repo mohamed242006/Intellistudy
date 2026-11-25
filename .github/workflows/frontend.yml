@@ -1,5 +1,7 @@
-# Frontend CI (docs/F0A_GATE.md GF0A-23): lockfile install, lint, types, unit and integration tests, static security
-# checks, dependency audit, production build; then end-to-end tests against a real backend and an OpenAPI drift check.
+# Frontend CI (docs/F0A_GATE.md GF0A-23, docs/F0B_GATE.md GF0B-30): lockfile install, lint, types, unit and integration
+# tests, static security checks, dependency audit, production build; then end-to-end tests against a real backend and
+# an OpenAPI drift check. Since F0-B the E2E backend runs its processing worker (uploads reach real terminal states), so
+# the E2E job also needs Tesseract (as in backend.yml) and the embedding model, which is cached between runs.
 # The backend workflow (backend.yml) is unchanged and still runs on every push.
 name: frontend
 
@@ -49,6 +51,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: system packages (document parsing, as in backend.yml)
+        working-directory: .
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr
       - name: install the locked backend environment
         working-directory: .
         run: >-
@@ -57,6 +62,14 @@ jobs:
           --index-url https://pypi.org/simple
           --extra-index-url https://download.pytorch.org/whl/cpu
           --index-strategy unsafe-best-match
+      - name: cache the embedding model (BAAI/bge-small-en-v1.5, ai/chunking/config.py)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-bge-small-en-v1.5-${{ hashFiles('requirements.lock.txt') }}
+      - name: fetch the embedding model before the tests (a no-op when cached)
+        working-directory: .
+        run: python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
       - uses: actions/setup-node@v4
         with:
           node-version: "24.22.3"
