@@ -42,17 +42,15 @@ one at a time and confirming the tests fail (11 for M5 alone).
 
 ## Before wider use
 
-| Before... | Required | Proposed owner | Proposed deadline |
+| Before... | Required | Owner | Milestone |
 |---|---|---|---|
-| any non-team user uploads a document | A privacy notice and consent: what is sent to DeepSeek and why (F-M5-02) | Project owner, reviewed by the supervisor | 2026-12-05 |
-| the final demo freeze | Repair split words at ingestion and reprocess documents, with the retrieval evaluation re-run (F-M4-07) | AI pipeline owner | 2026-12-09 |
-| any cloud deployment | HTTPS with HSTS, alerting on the security log, a shared rate-limit store, cloud CORS origins and secret management (F-M5-03, F-M2-13, contract Appendix B) | Deployment owner | 2026-12-16, or before the first deployment if earlier |
+| any production deployment | HTTPS with HSTS, client addresses behind the proxy, a shared rate-limit store, alerting, backups, cloud CORS origins and secret management (F-M5-03, F-M2-13); the frontend shows AI text as plain text (F-M4-03, upgraded to a blocker) | Mohamed Amir Kamal (deployment); Frontend Team (rendering) | R1 |
+| any non-team user uploads a document | A privacy notice and consent recorded by the server, the AI provider's data terms reviewed, supervisor approval (F-M5-02); account deletion | Mohamed Amir Kamal; approval by Prof. Gamal Ebrahim | P1 |
+| later quality work | Repair split words at ingestion (F-M4-07); fewer dropped quiz questions and question flagging (F-M4-02) | Mohamed Amir Kamal | M6 |
 
-Owners and dates are proposals; the team confirms them in the M5 sign-off.
+Owners and milestones confirmed 2026-11-25 in [`RELEASE_READINESS_PLAN.md`](RELEASE_READINESS_PLAN.md).
 
-## Remaining sign-off steps for M5
+## Status
 
-1. Owner sign-off of the OWASP review in `SECURITY_VERIFICATION.md`.
-2. One manual demo run with the real AI provider following [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md), recorded without
-   document content.
-3. Confirmation of the owners and deadlines above.
+**M5 approved 2026-11-25.** The OWASP review is signed off, the manual demo with the real AI provider met every target
+(M5 gate section 2.11), and owners are confirmed.

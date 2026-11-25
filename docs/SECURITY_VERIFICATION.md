@@ -1,6 +1,7 @@
 # Security Verification (contract 10.7)
 
-**Status:** release record for the backend vertical slice (end of M5). Version 1.0, 2026-11-25.
+**Status:** release record for the backend vertical slice (end of M5). Version 1.0, 2026-11-25. **Signed off
+2026-11-25.**
 **Authority:** [`backend_security_contract.md`](backend_security_contract.md) v1.10, section 10.7: *the vertical slice
 is releasable only when every row in 10.1-10.6 passes, the OWASP Top 10 and OWASP Top 10 for LLM Applications checklist
 is signed off against the contract, and no MUST rule is waived without a recorded contract change.*
@@ -153,5 +154,6 @@ added with its expected behaviour.
       test named in section 1 passed: run #9, commit `d990509`,
       https://github.com/mohamed242006/Intellistudy/actions/runs/45595607886.
 - [x] G5-SEC-01..08 passing in that run.
-- [ ] Owner sign-off of sections 3 and 4 against the contract, including the residuals (F-M3-03, F-M4-02, F-M4-03,
-      F-M5-02, F-M5-03).
+- [x] Owner sign-off of sections 3 and 4 against the contract, including the residuals (F-M3-03, F-M4-02, F-M4-03,
+      F-M5-02, F-M5-03): signed off by Mohamed Amir Kamal (backend lead), 2026-11-25. Their release conditions are in
+      [`RELEASE_READINESS_PLAN.md`](RELEASE_READINESS_PLAN.md) (F-M4-03 and F-M2-13 upgraded to production blockers).

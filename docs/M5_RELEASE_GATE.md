@@ -1,7 +1,7 @@
 # M5 Release Gate: Quiz Taking, End-to-End Slice and Security Verification
 
 **Status:** release gate for backend milestone M5 (quiz attempts and automatic grading, the end-to-end vertical slice,
-and the release-level security verification of the contract, section 10.7). **Version 1.1, approved 2026-11-25:**
+and the release-level security verification of the contract, section 10.7). **Status: M5 approved 2026-11-25** (section 3). **Version 1.1, approved 2026-11-25:**
 decisions D5-1..D5-10 approved as written; D5-11 (submitted attempts are immutable) added by the team and enforced
 through the existing items G5-ATT-07, G5-ATT-08 and G5-RTY-01 (expected results made explicit; goals and item count
 unchanged). v1.2 (2026-11-25, during implementation): G5-E2E-05 wording corrected to the approved M3 behaviour:
@@ -273,12 +273,19 @@ M5 is approved only when the record that completes it (pull request, or this fil
 - [x] Every `test_g5_*` test passed, no skips (61 items), plus the traceability test; M1-M4 gates still passing (run #9;
       the CI log needs repository access, so the per-test record is a verbose local run of the same commit: 61 of 61
       `ok`, no skips; the G5 tests contain no skip decorators).
-- [ ] `docs/SECURITY_VERIFICATION.md` complete: every contract 10.1-10.6 row mapped to passing tests (G5-SEC-01), the
-      OWASP checklist without open items (G5-SEC-08), signed by the owner. This is the contract's release gate (10.7).
+- [x] `docs/SECURITY_VERIFICATION.md` complete: every contract 10.1-10.6 row mapped to passing tests (G5-SEC-01), the
+      OWASP checklist without open items (G5-SEC-08), signed by the owner (Mohamed Amir Kamal, 2026-11-25). This is the
+      contract's release gate (10.7).
 - [x] Evidence (section 2.11): one manual demo run with DeepSeek following `docs/DEMO_RUNBOOK.md` on real lecture files (upload to
       results and retry), recorded without document content: processing time (NFR-PER-04), quiz generation time
       (NFR-PER-05), answer-save and grading times (NFR-PER-01, -06), tokens used, quiz yield.
-- [ ] Open items recorded with an owner and a deadline, none blocking the demo (proposed in
-      [`SECURITY_EXECUTIVE_SUMMARY.md`](SECURITY_EXECUTIVE_SUMMARY.md), awaiting team confirmation): F-M4-07 (soft hyphens at ingestion);
-      the privacy notice for sending document content to DeepSeek (contract Appendix B, required before any non-team
-      user uploads); the shared rate-limiter store before any multi-process deployment (contract 9a).
+- [x] Open items recorded with an owner and a target, none blocking the demo: approved
+      [`RELEASE_READINESS_PLAN.md`](RELEASE_READINESS_PLAN.md) (2026-11-25). Group A before any production deployment
+      (deployment tasks, shared limiter and trusted-proxy client IP, frontend UPL-15 verification; R1); group B before
+      non-team users (privacy notice and consent, account deletion; P1); group C in M6 (F-M4-07, F-M4-02 mitigations);
+      group D accepted (F-M3-03).
+
+**Verdict (2026-11-25): M5 approved.** All 61 items pass in CI (run #9); the security verification (contract 10.7) is
+signed off; the manual DeepSeek demo met every target. F-M4-04 is closed by D5-3..D5-5 and D5-11. The backend vertical
+slice is releasable for a local team demo. Production and public use are gated by the release readiness plan
+(groups A and B).
