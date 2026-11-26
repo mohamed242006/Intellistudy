@@ -24,3 +24,15 @@ export type ConversationList = components["schemas"]["ConversationList"];
 export type MessageOut = components["schemas"]["MessageOut"];
 export type CitationOut = components["schemas"]["CitationOut"];
 export type SourceOut = components["schemas"]["SourceOut"];
+
+export type QuizOut = components["schemas"]["QuizOut"];
+export type QuizDetail = components["schemas"]["QuizDetail"];
+export type QuizList = components["schemas"]["QuizList"];
+export type QuestionOut = components["schemas"]["QuestionOut"];
+export type AttemptOut = components["schemas"]["AttemptOut"];
+export type AttemptDetail = components["schemas"]["AttemptDetail"];
+export type AttemptList = components["schemas"]["AttemptList"];
+export type AttemptResults = components["schemas"]["AttemptResults"];
+export type ResultQuestion = components["schemas"]["ResultQuestion"];
+export type SavedAnswer = components["schemas"]["SavedAnswer"];
+export type AnswerOut = components["schemas"]["AnswerOut"];

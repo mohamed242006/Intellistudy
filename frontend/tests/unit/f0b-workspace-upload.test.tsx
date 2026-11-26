@@ -60,7 +60,8 @@ describe("GF0B-10 Course Workspace", () => {
     expect(within(details).getByText("48")).toBeVisible();
     expect(within(details).getByRole("button", { name: "Download" })).toBeVisible();
     expect(within(details).queryByRole("button", { name: "Retry" })).toBeNull();
-    expect(document.body.textContent).not.toMatch(/mastery|Topics found|OCR|Generate quiz/i);
+    expect(document.body.textContent).not.toMatch(/mastery|Topics found|OCR/i);
+    expect(within(details).getByRole("link", { name: "Generate quiz" })).toHaveAttribute("href", `/courses/${COURSE_ID}/quizzes?document=${ready.id}`);
     expect(screen.getByRole("link", { name: "Ask your materials" })).toHaveAttribute("href", `/courses/${COURSE_ID}/chat`);
     expect(within(details).getByRole("link", { name: "Open summary" })).toHaveAttribute("href", `/courses/${COURSE_ID}/documents/${ready.id}/summary`);
     expect(screen.getAllByRole("link", { name: "Courses" }).some((a) => a.getAttribute("aria-current") === "page")).toBe(true);

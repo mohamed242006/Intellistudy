@@ -7,6 +7,8 @@
 # model, no network. playwright.config.ts gives explicit ports; scripts/e2e-frontend.sh builds Next.js only with an
 # explicit backend origin (never :8000) and checks the built rewrite; INTELLISTUDY_E2E=1 makes next.config.ts refuse
 # a build without one. The retrieval models are fetched in their own step, then loaded offline during the run.
+# F2 (docs/F2_GATE.md GF2-28, GF2-29): the same harness and stub also generate quizzes (the backend's real quiz
+# validation, attempts, grading and retry run); the quiz path needs no further model, secret or step.
 # The backend workflow (backend.yml) is unchanged and still runs on every push.
 name: frontend
 

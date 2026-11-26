@@ -6,6 +6,7 @@ const FRONTEND = process.cwd();
 const GATE = readFileSync(join(FRONTEND, "..", "docs", "F0A_GATE.md"), "utf8");
 const GATE_B = readFileSync(join(FRONTEND, "..", "docs", "F0B_GATE.md"), "utf8");
 const GATE_F1 = readFileSync(join(FRONTEND, "..", "docs", "F1_GATE.md"), "utf8");
+const GATE_F2 = readFileSync(join(FRONTEND, "..", "docs", "F2_GATE.md"), "utf8");
 const WORKFLOW = readFileSync(join(FRONTEND, "..", ".github", "workflows", "frontend.yml"), "utf8");
 
 function testTitles(): string {
@@ -70,6 +71,22 @@ describe("gate traceability", () => {
     for (const step of ["npm ci", "npm run lint", "npm run typecheck", "npm test", "npm audit --audit-level=high", "npm run build", "npx playwright test", "git diff --exit-code -- lib/api/openapi.json lib/api/schema.d.ts", "tesseract-ocr", "INTELLISTUDY_E2E: \"1\"", "DETERMINISTIC TEST PROVIDER", "SentenceTransformer('BAAI/bge-small-en-v1.5')", "CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')"]) {
       expect(WORKFLOW, step).toContain(step);
     }
+    expect(WORKFLOW).not.toMatch(/DEEPSEEK_API_KEY|OPENAI_API_KEY|secrets\.(?!GITHUB_TOKEN)/);
+  });
+
+  it("every F2 gate item has at least one test that names it", () => {
+    const ids = [...GATE_F2.matchAll(/^\| (GF2-\d{2}) \|/gm)].map((m) => m[1]!);
+    expect(ids.length).toBe(29);
+    const titles = testTitles();
+    const missing = ids.filter((id) => id !== "GF2-29" && !new RegExp(`(it|test|describe)\\(\\s*"[^"]*${id}`).test(titles));
+    expect(missing).toEqual([]);
+  });
+
+  it("GF2-29 the frontend CI keeps every F0/F1 check and runs the F2 E2E with the same deterministic harness", () => {
+    for (const step of ["npm ci", "npm run lint", "npm run typecheck", "npm test", "npm audit --audit-level=high", "npm run build", "npx playwright test", "git diff --exit-code -- lib/api/openapi.json lib/api/schema.d.ts", "DETERMINISTIC TEST PROVIDER", "GF2-28, GF2-29", "CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')"]) {
+      expect(WORKFLOW, step).toContain(step);
+    }
+    expect(readdirSync(join(FRONTEND, "tests", "e2e"))).toContain("quiz.spec.ts");
     expect(WORKFLOW).not.toMatch(/DEEPSEEK_API_KEY|OPENAI_API_KEY|secrets\.(?!GITHUB_TOKEN)/);
   });
 });

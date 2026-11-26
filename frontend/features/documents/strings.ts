@@ -22,6 +22,8 @@ export const FIGMA = {
   open: "Open",
   openSummary: "Open summary",
   askMaterials: "Ask your materials",
+  generateQuiz: "Generate quiz",
+  quizzes: "Quizzes",
   addFiles: "Add files",
   uploadFiles: "Upload files",
   materials: "Materials",

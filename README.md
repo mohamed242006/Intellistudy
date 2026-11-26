@@ -85,7 +85,9 @@ Detailed records: [`docs/backend_security_contract.md`](docs/backend_security_co
 
 - **Done:** backend vertical slice: accounts, courses, upload and processing, grounded chat, summaries, quiz generation,
   quiz taking (M0-M5).
-- **Frontend:** designed in Figma ([`docs/figma_ui_context.md`](docs/figma_ui_context.md)); not yet built.
+- **Frontend** (`frontend/`, Next.js): milestones F0 (accounts, dashboard, courses, uploads) and F1 (grounded
+  summaries and chat) are complete with green CI; F2 (quizzes, attempts and review) is implemented and awaiting CI
+  ([`frontend/README.md`](frontend/README.md), gates `docs/F0A_GATE.md` … `docs/F2_GATE.md`).
 - **Before production or public use:** HTTPS and deployment hardening, a privacy notice and consent for the external AI
   provider, account deletion ([`docs/RELEASE_READINESS_PLAN.md`](docs/RELEASE_READINESS_PLAN.md)).
 

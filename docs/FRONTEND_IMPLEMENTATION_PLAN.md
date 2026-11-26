@@ -1,7 +1,8 @@
 # Frontend Implementation Plan
 
-**Status:** proposal for team approval, 2026-11-25. **No frontend code exists.** Implementation starts with F0 after
-the decisions in section 11.3 are made.
+**Status:** proposal approved for implementation, 2026-11-25. **Progress (2026-11-26):** F0-A, F0-B and F1 complete
+(CI green); F2 implemented, awaiting CI ([`F2_GATE.md`](F2_GATE.md)); F3-F5 not started. Section 11.3 decisions taken
+so far are recorded in the F0A, F0B, F1 and F2 gate documents.
 **Visual source of truth:** [`figma_ui_context.md`](figma_ui_context.md) (revision 2; cited as "UI §n"), and behind it
 the Figma file itself. Nothing is redesigned, improved or invented. Where the backend cannot supply what a frame
 shows, this plan says so (section 11). It never fills the gap with invented UI or sample data.

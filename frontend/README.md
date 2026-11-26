@@ -3,11 +3,11 @@
 Next.js 15 (App Router), TypeScript (strict), Tailwind CSS v4, TanStack Query, React Hook Form, Zod.
 Visual source of truth: [`../docs/figma_ui_context.md`](../docs/figma_ui_context.md). Plan and gates:
 [`../docs/FRONTEND_IMPLEMENTATION_PLAN.md`](../docs/FRONTEND_IMPLEMENTATION_PLAN.md), [`../docs/F0A_GATE.md`](../docs/F0A_GATE.md),
-[`../docs/F0B_GATE.md`](../docs/F0B_GATE.md), [`../docs/F1_GATE.md`](../docs/F1_GATE.md).
+[`../docs/F0B_GATE.md`](../docs/F0B_GATE.md), [`../docs/F1_GATE.md`](../docs/F1_GATE.md), [`../docs/F2_GATE.md`](../docs/F2_GATE.md).
 
 **Status:** F0-A (foundations, Sign in, Sign up, session, route protection) and F0-B (Dashboard, courses, Course
-Workspace, uploads with processing status, retry, download and deletion) and F1 (grounded summaries and chat with
-cited sources).
+Workspace, uploads with processing status, retry, download and deletion), F1 (grounded summaries and chat with
+cited sources) and F2 (quiz generation, attempts, results and review).
 
 | Route | Screen |
 |---|---|
@@ -17,6 +17,10 @@ cited sources).
 | `/courses/[courseId]/upload` | Upload flow |
 | `/courses/[courseId]/documents/[documentId]/summary` | Summary (`?source=n` opens a citation) |
 | `/courses/[courseId]/chat` | Chat (`?c=` selects a conversation) |
+| `/courses/[courseId]/quizzes` | Course quizzes and the generation form (`?document=` preselects a file) |
+| `/quizzes/[quizId]` | Quiz status, Start or Continue, attempt history |
+| `/quizzes/[quizId]/attempts/[attemptId]` | Taking a quiz |
+| `/attempts/[attemptId]/review` | Results and review |
 
 ## Run
 
@@ -48,7 +52,8 @@ The end-to-end suite starts a throwaway backend with `scripts/e2e-backend.sh`:
 - no LLM provider;
 - the processing worker on (since F0-B), so uploads reach real terminal states with the real embedding model (loaded
   offline from the local cache; `E2E_HF_OFFLINE=0` allows a first download);
-- a **deterministic test provider** (`tests/e2e/fixtures/stub_llm.py`, F1) through the backend's `local` provider slot:
+- a **deterministic test provider** (`tests/e2e/fixtures/stub_llm.py`, F1; quizzes since F2) through the backend's
+  `local` provider slot:
   no key, no real model, no network. Retrieval, grounding, citation validation and answer states are the backend's
   real code;
 - the real rate limits;

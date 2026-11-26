@@ -12,6 +12,12 @@ ownership validation and state rules still decide every outcome:
   a question containing "outage" gets HTTP 503 (the provider is unavailable).
 Partial and refused states come from retrieval (missing terms, nothing relevant), not from this stub.
 
+* quiz prompts (F2): one question per distinct source sentence, alternating multiple choice and true/false within the
+  requested types. The correct option is the sentence's own keyword (a word no other sentence uses); distractors are
+  other sentences' keywords; every other true/false statement swaps its keyword for another one, so it is false.
+  Evidence is the sentence copied word for word. The backend's quiz validation (structure, quoted evidence, support,
+  single answer, near-duplicates) still decides which questions are kept, and the backend shuffles the options.
+
 Usage: python stub_llm.py PORT
 """
 
@@ -35,12 +41,63 @@ def first_sentence(body: str) -> str:
     return " ".join(body.split())[:200].rstrip(".!?")
 
 
+_WORD = re.compile(r"[A-Za-z]{5,}")
+_REQUEST = re.compile(r"Write (\d+) (.+?) questions as one JSON object")
+
+
+def sentences_of(tag: str, body: str) -> list[tuple[str, str]]:
+    text = " ".join(body.split("\n\n[Wider section]\n", 1)[0].split())
+    seen: list[tuple[str, str]] = []
+    for raw in _SENTENCE.split(text):
+        sentence = raw.strip()
+        if len(sentence.split()) >= 6 and sentence.endswith(".") and sentence not in {s for _, s in seen}:
+            seen.append((tag, sentence))
+    return seen
+
+
+def quiz_reply(user: str, sources: list[tuple[str, str]]) -> str:
+    match = _REQUEST.search(user)
+    count = int(match.group(1)) if match else 5
+    kinds = match.group(2) if match else "multiple-choice and true/false"
+    types = [t for t, word in (("mcq", "multiple-choice"), ("true_false", "true/false")) if word in kinds]
+    pool = [item for tag, body in sources for item in sentences_of(tag, body)]
+    words = [{w.lower() for w in _WORD.findall(s)} for _, s in pool]
+    keywords: list[str | None] = []
+    for i, (_, sentence) in enumerate(pool):
+        others = set().union(*(w for j, w in enumerate(words) if j != i)) if len(words) > 1 else set()
+        unique = sorted((w for w in _WORD.findall(sentence) if w.lower() not in others), key=lambda w: (-len(w), w))
+        keywords.append(unique[0] if unique else None)
+    usable = [(tag, s, k) for (tag, s), k in zip(pool, keywords, strict=True) if k]
+    questions = []
+    for i, (tag, sentence, keyword) in enumerate(usable[:count]):
+        others = [k for _, _, k in usable if k != keyword]
+        kind = types[i % len(types)]
+        common = {"sources": [tag], "evidence": sentence, "difficulty": "easy", "cognitive_level": "remember",
+                  "topic": "Queueing basics" if i < len(usable) // 2 else "Queue behaviour"}
+        if kind == "mcq" and len(others) >= 3:
+            distractors = others[i % len(others):] + others[: i % len(others)]
+            options = [keyword, *distractors[:3]]
+            questions.append({"type": "mcq", "stem": f"Which word completes this statement from your notes: "
+                              f"\"{sentence.replace(keyword, '_____')}\"", "options": options, "correct_index": 0,
+                              "rationales": [f"The cited sentence uses \"{keyword}\"."] +
+                              [f"\"{d}\" belongs to a different statement." for d in distractors[:3]], **common})
+        else:
+            false = i % 4 == 3 and others
+            stem = sentence.replace(keyword, others[0]) if false else sentence
+            questions.append({"type": "true_false", "stem": stem, "answer": not false,
+                              "rationale": f"The cited sentence uses \"{keyword}\"." if false else
+                              "The cited sentence says exactly this.", **common})
+    return json.dumps({"questions": questions})
+
+
 def reply_for(messages: list[dict[str, str]]) -> tuple[int, str]:
     system = messages[0]["content"] if messages else ""
     user = messages[-1]["content"] if messages else ""
     sources = _SOURCE.findall(user)
     if not sources:
         return 200, "INSUFFICIENT_CONTEXT"
+    if "practice questions" in system:
+        return 200, quiz_reply(user, sources)
     if "study summary" in system:
         return 200, "\n\n".join(f"### [{tag}]\n{first_sentence(body)} [{tag}]." for tag, body in sources)
     question = user.rsplit("Question:", 1)[-1].strip().lower()

@@ -219,7 +219,7 @@ F1 is complete only after local checks pass, the user pushes the commit, and the
 | ruff (backend, AI, tests, E2E fixtures) | clean |
 | Backend regression (no backend file changed) | 402 tests OK |
 | Real provider (DeepSeek) | **not run**. No automated test calls a real model |
-| CI | run frontend #3 (`a37bb56`) **failed** in E2E: see below; fixed in the follow-up commit, CI pending its push |
+| CI | run frontend #3 (`a37bb56`) **failed** in E2E (see below); fixed by `7d23548`, on which the frontend and backend workflows are **green**, including the real-backend E2E with both models cached |
 
 Found and fixed while testing:
 
@@ -250,5 +250,5 @@ Found and fixed while testing:
   - with the normal cache, 26/26 pass twice;
   - Vitest 182/182.
 
-**Not verified here:** a real screen-reader audit, the real-model answer quality (manual demo only), final mobile
-fidelity, and the CI run.
+**Not verified here:** a real screen-reader audit, the real-model answer quality (manual demo only), and final
+mobile fidelity. **F1 and GF1-27 are complete** (CI green on `7d23548`).

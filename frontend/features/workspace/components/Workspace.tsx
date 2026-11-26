@@ -95,6 +95,9 @@ export function Workspace({ courseId }: { courseId: string }) {
           <h1 className="min-w-0 text-h1 break-words text-fg">{data.name}</h1>
           <div className="flex flex-wrap gap-3">
             <ButtonLink href={`/courses/${encodeURIComponent(courseId)}/chat`}>{FIGMA.askMaterials}</ButtonLink>
+            <ButtonLink href={`/courses/${encodeURIComponent(courseId)}/quizzes`} variant="secondary">
+              {FIGMA.quizzes}
+            </ButtonLink>
             <Button variant="secondary" onClick={() => setRenaming(true)}>
               {COURSE_COPY.rename}
             </Button>
@@ -210,6 +213,7 @@ export function Workspace({ courseId }: { courseId: string }) {
             onRetry={() => runRetry(selected)}
             onDelete={() => setDeletingDoc(selected)}
             summaryHref={`/courses/${encodeURIComponent(courseId)}/documents/${encodeURIComponent(selected.id)}/summary`}
+            quizHref={`/courses/${encodeURIComponent(courseId)}/quizzes?document=${encodeURIComponent(selected.id)}`}
           />
         ) : documents.isSuccess && summary.total > 0 ? (
           <p className="text-body-sm text-fg-secondary">{requested ? PROVISIONAL.notFound : PROVISIONAL.selectHint}</p>
