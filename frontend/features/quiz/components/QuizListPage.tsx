@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { Button } from "@/design-system/components/Button";
 import { EmptyState } from "@/design-system/components/EmptyState";
 import { Input } from "@/design-system/components/Input";
@@ -12,7 +12,9 @@ import { Breadcrumb } from "@/design-system/compositions/Breadcrumb";
 import { CourseNotFound } from "@/features/courses/components/CourseNotFound";
 import { useCourse } from "@/features/courses/hooks";
 import { FIGMA as COURSE_FIGMA } from "@/features/courses/strings";
+import { DocumentPicker } from "@/features/documents/components/DocumentPicker";
 import { useDocuments } from "@/features/documents/hooks";
+import { SELECTION_COPY, prune } from "@/features/documents/selection";
 import { ApiError } from "@/lib/api/errors";
 import type { DocumentOut, QuizOut } from "@/lib/api/types";
 import { relativeTime } from "@/lib/format/format";
@@ -21,14 +23,15 @@ import { useRetryAfter } from "@/lib/hooks/use-retry-after";
 import type { QuizRequest } from "../api";
 import { useCreateQuiz, useQuizzes } from "../hooks";
 import { quizError } from "../messages";
-import { FIGMA, PROVISIONAL } from "../strings";
+import { PROVISIONAL } from "../strings";
 
 export const MIN_QUESTIONS = 5;
 export const MAX_QUESTIONS = 30;
 export const MAX_QUIZ_DOCUMENTS = 20;
 export const TITLE_MAX = 200;
 
-export type QuizForm = { title: string; count: string; mcq: boolean; trueFalse: boolean; scope: "all" | "some"; documents: string[] };
+/** `documents` is the explicit selection (DocumentPicker); "Select all ready files" sends every ready id explicitly. */
+export type QuizForm = { title: string; count: string; mcq: boolean; trueFalse: boolean; documents: string[] };
 export type QuizFormErrors = Partial<Record<"title" | "count" | "types" | "files", string>>;
 
 /** Client checks mirroring QuizCreate (backend/app/api/v1/generation.py); the backend stays authoritative (GF2-03). */
@@ -41,12 +44,11 @@ export function validateQuizForm(form: QuizForm, ready: readonly Pick<DocumentOu
   const types = [...(form.mcq ? (["mcq"] as const) : []), ...(form.trueFalse ? (["true_false"] as const) : [])];
   if (types.length === 0) errors.types = PROVISIONAL.errors.types;
   const readyIds = new Set(ready.map((d) => d.id));
-  const documents = form.documents.filter((id) => readyIds.has(id));
-  if (form.scope === "some" && (documents.length < 1 || documents.length > MAX_QUIZ_DOCUMENTS)) errors.files = PROVISIONAL.errors.files;
+  const documents = [...new Set(form.documents)].filter((id) => readyIds.has(id));
+  if (documents.length < 1 || documents.length > MAX_QUIZ_DOCUMENTS) errors.files = PROVISIONAL.errors.files;
   if (Object.keys(errors).length) return { request: null, errors };
-  const request: QuizRequest = { question_count: count, question_types: types };
+  const request: QuizRequest = { question_count: count, question_types: types, document_ids: documents };
   if (title) request.title = title;
-  if (form.scope === "some") request.document_ids = documents;
   return { request, errors };
 }
 
@@ -93,8 +95,8 @@ export function QuizListPage({ courseId }: { courseId: string }) {
         <p className="text-body text-fg-secondary">{PROVISIONAL.generateBody}</p>
         {documents.isPending ? <div aria-busy="true" role="status" aria-label={PROVISIONAL.loading} className="h-10" /> : null}
         {documents.isSuccess && ready.length === 0 ? <Notice tone="info" title={PROVISIONAL.noReadyFiles} /> : null}
-        {documents.isSuccess && ready.length > 0 ? (
-          <GenerateForm key={preselected ?? "all"} courseId={courseId} ready={ready} preselected={preselected && ready.some((d) => d.id === preselected) ? preselected : null} />
+        {documents.isSuccess && documents.documents.length > 0 ? (
+          <GenerateForm key={preselected ?? "none"} courseId={courseId} all={documents.documents} ready={ready} preselected={preselected && ready.some((d) => d.id === preselected) ? preselected : null} />
         ) : null}
       </section>
 
@@ -148,14 +150,24 @@ function QuizRow({ quiz, now }: { quiz: QuizOut; now: Date }) {
   );
 }
 
-function GenerateForm({ courseId, ready, preselected }: { courseId: string; ready: DocumentOut[]; preselected: string | null }) {
+function GenerateForm({ courseId, all, ready, preselected }: { courseId: string; all: DocumentOut[]; ready: DocumentOut[]; preselected: string | null }) {
   const router = useRouter();
   const create = useCreateQuiz(courseId);
   const retryAfter = useRetryAfter();
   const ids = useId();
-  const [form, setForm] = useState<QuizForm>({ title: "", count: "10", mcq: true, trueFalse: true, scope: preselected ? "some" : "all", documents: preselected ? [preselected] : [] });
+  const [form, setForm] = useState<QuizForm>({ title: "", count: "10", mcq: true, trueFalse: true, documents: preselected ? [preselected] : [] });
   const [errors, setErrors] = useState<QuizFormErrors>({});
   const [problem, setProblem] = useState<string | null>(null);
+  // Files that stop being ready (deleted, reprocessed) leave the selection, and the reader is told.
+  const { kept, dropped } = prune(form.documents, all);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (dropped.length) {
+      setForm((f) => ({ ...f, documents: prune(f.documents, all).kept }));
+      setNotice(SELECTION_COPY.dropped(dropped.length));
+    }
+  }, [dropped.length, all]);
+  const selectedCount = kept.length;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -167,7 +179,7 @@ function GenerateForm({ courseId, ready, preselected }: { courseId: string; read
     create.mutate(request, {
       onSuccess: (quiz) => router.push(`/quizzes/${encodeURIComponent(quiz.id)}`),
       onError: (error) => {
-        retryAfter.note(error);
+        retryAfter.note(error); // the selection is kept so the reader can retry
         setProblem(quizError(error));
       },
     });
@@ -203,46 +215,30 @@ function GenerateForm({ courseId, ready, preselected }: { courseId: string; read
           </p>
         ) : null}
       </fieldset>
-      <fieldset className="flex flex-col gap-2" aria-describedby={errors.files ? `${ids}-files` : undefined}>
-        <legend className="mb-1 text-label text-fg">{PROVISIONAL.filesLegend}</legend>
-        {(
-          [
-            ["all", PROVISIONAL.allFiles],
-            ["some", PROVISIONAL.chooseFiles],
-          ] as const
-        ).map(([scope, label]) => (
-          <label key={scope} className="flex min-h-11 cursor-pointer items-center gap-2 text-body text-fg">
-            <input type="radio" name={`${ids}-scope`} checked={form.scope === scope} onChange={() => setForm({ ...form, scope })} className="size-5 accent-[var(--color-accent)]" />
-            {label}
-          </label>
-        ))}
-        {form.scope === "some" ? (
-          <ul className="flex flex-col gap-1 pl-7">
-            {ready.map((doc) => (
-              <li key={doc.id}>
-                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-body text-fg">
-                  <input
-                    type="checkbox"
-                    checked={form.documents.includes(doc.id)}
-                    onChange={(e) => setForm({ ...form, documents: e.target.checked ? [...form.documents, doc.id] : form.documents.filter((id) => id !== doc.id) })}
-                    className="size-5 shrink-0 accent-[var(--color-accent)]"
-                  />
-                  <span className="min-w-0 wrap-anywhere">{doc.file_name}</span>
-                </label>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+      <div className="flex flex-col gap-2">
+        {notice ? <Notice tone="info" title={notice} /> : null}
+        <DocumentPicker
+          legend={PROVISIONAL.filesLegend}
+          documents={all}
+          selected={kept}
+          disabled={create.isPending}
+          hint={selectedCount === 0 ? SELECTION_COPY.quizHint : undefined}
+          onChange={(documents) => {
+            setNotice(null);
+            setForm({ ...form, documents });
+          }}
+        />
         {errors.files ? (
           <p id={`${ids}-files`} className="text-body-sm text-danger-fg">
             {errors.files}
           </p>
         ) : null}
-      </fieldset>
-      <div>
-        <Button type="submit" loading={create.isPending} disabled={retryAfter.blocked}>
-          {FIGMA.generateQuiz}
+      </div>
+      <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-3 border-t border-line bg-surface px-6 py-4 sm:static sm:mx-0 sm:border-0 sm:p-0">
+        <Button type="submit" loading={create.isPending} disabled={retryAfter.blocked || selectedCount === 0}>
+          {create.isPending ? SELECTION_COPY.creatingQuiz : SELECTION_COPY.createQuiz(selectedCount)}
         </Button>
+        {selectedCount === 0 ? <p className="text-body-sm text-fg-secondary">{SELECTION_COPY.quizHint}</p> : null}
       </div>
     </form>
   );

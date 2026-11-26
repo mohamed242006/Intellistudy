@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { ALICE, BOB } from "./accounts";
-import { WIDTHS, makeFixtures, noInjectedMarkup, overflowAt, seriousViolations, signIn } from "./support";
+import { WIDTHS, addMaterials, makeFixtures, noInjectedMarkup, overflowAt, seriousViolations, signIn } from "./support";
 
 /**
  * F2 end to end (docs/F2_GATE.md) against the isolated backend with the DETERMINISTIC TEST PROVIDER (never a real
@@ -47,8 +47,7 @@ test("GF2-28 GF2-01 the isolated backend with the deterministic provider; a quiz
   await page.getByRole("button", { name: "Create course" }).click();
   await expect(page.getByRole("heading", { level: 1, name: COURSE })).toBeVisible();
   await page.getByRole("link", { name: "Add files" }).click();
-  await page.getByTestId("file-input").setInputFiles([join(fixtures, "quiz-notes.pdf")]);
-  await expect(page.getByText("1 indexed · 0 in progress · 0 need attention")).toBeVisible({ timeout: 180_000 });
+  await addMaterials(page, [join(fixtures, "quiz-notes.pdf")], "1 indexed · 0 in progress · 0 need attention");
   await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: COURSE }).click();
   await page.getByRole("link", { name: "Generate quiz" }).click();
   await expect(page).toHaveURL(/\/quizzes\?document=[0-9a-f-]{36}$/);
@@ -61,7 +60,7 @@ test("GF2-03 GF2-04 GF2-05 generation from the keyboard follows the real lifecyc
   test.setTimeout(120_000);
   const count = page.getByLabel("Number of questions");
   await count.fill("8");
-  await page.getByRole("button", { name: "Generate quiz" }).focus();
+  await page.getByRole("button", { name: "Create quiz from 1 file" }).focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/quizzes\/[0-9a-f-]{36}$/);
   quizUrl = new URL(page.url()).pathname;

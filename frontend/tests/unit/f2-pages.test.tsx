@@ -68,9 +68,12 @@ describe("GF2-01 GF2-02 GF2-03 GF2-04 course quizzes", () => {
   it("GF2-01 GF2-03 a file from the workspace is preselected; only ready files can be chosen", async () => {
     base();
     openList(`document=${DOC_A.id}`);
-    expect(await screen.findByRole("radio", { name: "Only these files" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "quiz-notes.pdf" })).toBeChecked();
-    expect(screen.queryByRole("checkbox", { name: "unready.pdf" })).toBeNull();
+    expect(await screen.findByRole("checkbox", { name: "quiz-notes.pdf" })).toBeChecked();
+    const unready = screen.getByRole("checkbox", { name: "unready.pdf, Processing" }); // visible, never selectable
+    expect(unready).toBeDisabled();
+    expect(unready).not.toBeChecked();
+    expect(screen.getByTestId("selected-count")).toHaveTextContent("1 file selected");
+    expect(screen.getByRole("button", { name: "Create quiz from 1 file" })).toBeEnabled();
     expect(await screen.findByRole("heading", { name: "No quizzes yet" })).toBeVisible();
   });
 
@@ -83,11 +86,14 @@ describe("GF2-01 GF2-02 GF2-03 GF2-04 course quizzes", () => {
     await userEvent.type(count, "8");
     await userEvent.type(screen.getByLabelText("Title (optional)"), "  Week 3  ");
     await userEvent.click(screen.getByRole("checkbox", { name: "Multiple choice" }));
-    const submit = screen.getByRole("button", { name: "Generate quiz" });
+    expect(screen.getByRole("button", { name: "Create quiz from 0 files" })).toBeDisabled(); // nothing selected yet
+    expect(screen.getAllByText("Select at least one ready file to create a quiz.").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select all ready files" })); // ready files only
+    const submit = screen.getByRole("button", { name: "Create quiz from 1 file" });
     await userEvent.click(submit);
     await userEvent.click(submit);
     expect(postBody(b, `/courses/${COURSE_ID}/quizzes`)).toHaveLength(1);
-    expect(postBody(b, `/courses/${COURSE_ID}/quizzes`)[0]!.body).toEqual({ title: "Week 3", question_count: 8, question_types: ["true_false"] });
+    expect(postBody(b, `/courses/${COURSE_ID}/quizzes`)[0]!.body).toEqual({ title: "Week 3", question_count: 8, question_types: ["true_false"], document_ids: [DOC_A.id] });
     hold.resolve();
     await waitFor(() => expect(nav.push).toHaveBeenCalledWith(`/quizzes/${QUIZ_ID}`));
   });
@@ -98,15 +104,17 @@ describe("GF2-01 GF2-02 GF2-03 GF2-04 course quizzes", () => {
     const count = await screen.findByLabelText("Number of questions");
     await userEvent.clear(count);
     await userEvent.type(count, "40");
-    await userEvent.click(screen.getByRole("button", { name: "Generate quiz" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "quiz-notes.pdf" }));
+    await userEvent.click(screen.getByRole("button", { name: "Create quiz from 1 file" }));
     expect(screen.getByText("Choose a number from 5 to 30.")).toBeVisible();
     expect(count).toHaveAttribute("aria-invalid", "true");
     expect(postBody(b, `/courses/${COURSE_ID}/quizzes`)).toHaveLength(0);
     await userEvent.clear(count);
     await userEvent.type(count, "10");
-    await userEvent.click(screen.getByRole("button", { name: "Generate quiz" }));
+    await userEvent.click(screen.getByRole("button", { name: "Create quiz from 1 file" }));
     expect(await screen.findByText("Too many requests. Try again in 10 minutes.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Generate quiz" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Create quiz from 1 file" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "quiz-notes.pdf" })).toBeChecked(); // the selection survives the refusal
   });
 });
 

@@ -149,8 +149,18 @@ test("GF0B-15 GF0B-19 GF0B-18 GF0B-28 PDF, PPTX and DOCX upload with progress an
   const files = ["lecture-notes.pdf", "lecture-slides.pptx", "handout.docx", "blank.pdf", "damaged.pdf"];
   await (await chooser).setFiles(files.map((f) => join(fixtures, f)));
 
-  // Deterministic in-flight state: rows exist before any processing ends, each with its own status.
-  await expect(page.getByText(/^(Waiting|Uploading \d+%|Extracting)$/).first()).toBeVisible();
+  // Choosing files only stages them: one "Selected" row each, nothing sent until "Add these files" (ADD-*).
+  for (const name of files) await expect(row(page, name).getByText("Selected", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nothing is uploaded until you add the files.")).toBeVisible();
+  expect(await seriousViolations(page), "Upload page with staged files").toEqual([]);
+  const add = page.getByRole("button", { name: "Add these files" });
+  await add.focus();
+  await page.keyboard.press("Enter"); // keyboard path for the explicit action
+  // Every file accepted: success state, then the course workspace (client navigation), processing visible there.
+  await expect(page).toHaveURL(/\/courses\/[0-9a-f-]{36}$/, { timeout: 60_000 });
+  await expect(page.getByText("5 files added. Processing has started.").first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: COURSE })).toBeVisible();
+  await page.getByRole("link", { name: "Add files" }).first().click();
   for (const name of files) await expect(row(page, name)).toHaveCount(1);
 
   const expected: Record<string, string> = {
@@ -240,6 +250,9 @@ test("GF0B-25 F-M4-03 — Frontend Rendering Safety: hostile course and file nam
   await expect(page.getByRole("heading", { level: 1, name: HOSTILE_COURSE })).toBeVisible();
   await page.getByRole("link", { name: "Add files" }).click();
   await page.getByTestId("file-input").setInputFiles({ name: HOSTILE_FILE, mimeType: "application/pdf", buffer: readFileSync(join(fixtures, "hostile.pdf")) });
+  await page.getByRole("button", { name: "Add this file" }).click();
+  await expect(page).toHaveURL(/\/courses\/[0-9a-f-]{36}$/, { timeout: 60_000 });
+  await page.getByRole("link", { name: "Add files" }).first().click();
   await expect(row(page, HOSTILE_FILE).getByText("Indexed", { exact: true })).toBeVisible({ timeout: 120_000 });
   await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: HOSTILE_COURSE }).click();
   await page.getByRole("button", { name: "Rename" }).click();
@@ -303,6 +316,10 @@ test("UPL-PROXY a PowerPoint over 10 MB reaches the backend whole through the Ne
   try {
     await page.getByTestId("file-input").setInputFiles([large, join(fixtures, "renamed-video.pptx")]);
     await expect(row(page, "renamed-video.pptx")).toContainText("doesn’t match its extension");
+    expect(sent).toHaveLength(0); // staged: nothing sent before the explicit action
+    await page.getByRole("button", { name: "Add this file" }).click(); // the renamed file is not counted
+    await expect(page).toHaveURL(/\/courses\/[0-9a-f-]{36}$/, { timeout: 120_000 });
+    await page.getByRole("link", { name: "Add files" }).first().click();
     await expect(row(page, "large-lecture.pptx").getByText("Indexed", { exact: true })).toBeVisible({ timeout: 240_000 });
     expect(sent).toHaveLength(1); // only the real PowerPoint was uploaded
     expect(await overflowAt(page), "Upload overflow with a large file").toEqual([]);

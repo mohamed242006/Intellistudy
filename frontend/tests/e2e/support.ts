@@ -63,3 +63,16 @@ export async function signIn(page: Page, email: string) {
   }
   await expect(page.getByRole("heading", { name: "Your courses" })).toBeVisible();
 }
+
+/**
+ * Add materials as a reader does: choose files (staged, nothing sent), press "Add this file / Add these files", and land
+ * on the course workspace once the backend accepted every file. Then open the upload list again and wait for the
+ * processing outcome `settled` (for example "2 indexed · 0 in progress · 0 need attention").
+ */
+export async function addMaterials(page: Page, files: string[], settled: string) {
+  await page.getByTestId("file-input").setInputFiles(files);
+  await page.getByRole("button", { name: files.length === 1 ? "Add this file" : "Add these files" }).click();
+  await expect(page).toHaveURL(/\/courses\/[0-9a-f-]{36}$/, { timeout: 60_000 });
+  await page.getByRole("link", { name: "Add files" }).first().click();
+  await expect(page.getByText(settled)).toBeVisible({ timeout: 180_000 });
+}

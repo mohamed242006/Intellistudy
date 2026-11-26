@@ -95,6 +95,9 @@ export function Workspace({ courseId }: { courseId: string }) {
           <h1 className="min-w-0 text-h1 break-words text-fg">{data.name}</h1>
           <div className="flex flex-wrap gap-3">
             <ButtonLink href={`/courses/${encodeURIComponent(courseId)}/chat`}>{FIGMA.askMaterials}</ButtonLink>
+            <ButtonLink href={`/courses/${encodeURIComponent(courseId)}/summaries`} variant="secondary">
+              {FIGMA.summaries}
+            </ButtonLink>
             <ButtonLink href={`/courses/${encodeURIComponent(courseId)}/quizzes`} variant="secondary">
               {FIGMA.quizzes}
             </ButtonLink>

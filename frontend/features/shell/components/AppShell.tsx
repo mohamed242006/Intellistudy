@@ -26,7 +26,7 @@ const DESTINATIONS: readonly Destination[] = [
 
 function activeKey(pathname: string | null): Destination["key"] {
   if (pathname && /^\/settings(\/|$)/.test(pathname)) return "settings";
-  return pathname && /^\/(courses|quizzes|attempts)(\/|$)/.test(pathname) ? "courses" : "dashboard";
+  return pathname && /^\/(courses|quizzes|attempts|summaries)(\/|$)/.test(pathname) ? "courses" : "dashboard";
 }
 
 function SkipLink() {

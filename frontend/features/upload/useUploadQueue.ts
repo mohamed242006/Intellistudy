@@ -16,7 +16,7 @@ import { ApiError } from "@/lib/api/errors";
 import { UploadAbortedError, uploadFile } from "@/lib/api/upload";
 import { upsertDocument } from "@/features/documents/hooks";
 import { PROVISIONAL } from "@/features/documents/strings";
-import { initialQueue, nextPending, problemForClient, problemForError, queueReducer } from "./queue";
+import { batchProgress, initialQueue, nextPending, problemForClient, problemForError, queueReducer } from "./queue";
 import { contentProblem, type ClientProblem } from "./validation";
 
 /** A file refused by the content check before any byte was sent. */
@@ -135,7 +135,21 @@ export function useUploadQueue(courseId: string, activeCount: number) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploading, blockedByCapacity, pausedUntil, phases, courseId]);
 
+  // Staged files are checked by content right away (signature and reported type), so the reader sees a refusal before
+  // choosing "Add". The same check runs again just before each transfer.
+  const checked = useRef(new Set<string>());
+  useEffect(() => {
+    for (const item of state.items) {
+      if (item.phase !== "selected" || checked.current.has(item.id)) continue;
+      checked.current.add(item.id);
+      void contentProblem(item.file).then((problem) => {
+        if (problem) dispatch({ type: "refused", id: item.id, problem: problemForClient(problem) });
+      });
+    }
+  }, [state.items]);
+
   const add = useCallback((files: File[]) => dispatch({ type: "add", files, makeId }), []);
+  const submit = useCallback(() => dispatch({ type: "submit" }), []);
   const retry = useCallback((id: string) => dispatch({ type: "retry", id }), []);
   const remove = useCallback((id: string) => {
     const controller = controllers.current.get(id);
@@ -143,5 +157,22 @@ export function useUploadQueue(courseId: string, activeCount: number) {
     else dispatch({ type: "remove", id });
   }, []);
 
-  return { items: state.items, add, retry, remove, announcement, blockedByCapacity, paused: pausedUntil > Date.now() };
+  const staged = state.items.filter((item) => item.phase === "selected").length;
+  const progress = batchProgress(state);
+  return {
+    items: state.items,
+    add,
+    submit,
+    retry,
+    remove,
+    announcement,
+    blockedByCapacity,
+    paused: pausedUntil > Date.now(),
+    /** Files chosen but not submitted yet. */
+    staged,
+    /** The last submission (null before the first one). */
+    batch: state.batch ? progress : null,
+    /** Leaving now would lose files: some are staged or still uploading. */
+    unsaved: staged > 0 || state.items.some((item) => item.phase === "pending" || item.phase === "uploading"),
+  };
 }

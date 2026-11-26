@@ -26,7 +26,7 @@ import { generationFailure, summaryRequestError } from "../messages";
 import { FIGMA, PROVISIONAL } from "../strings";
 
 /** `?source=n`: a positive integer naming one of this summary's citation numbers; anything else is ignored. */
-export function parseSourceParam(raw: string | null, summary: SummaryOut | null | undefined): number | null {
+export function parseSourceParam(raw: string | null, summary: Pick<SummaryOut, "citations"> | null | undefined): number | null {
   if (!raw || !/^[1-9]\d{0,3}$/.test(raw)) return null;
   const n = Number(raw);
   return summary?.citations.some((c) => c.number === n) ? n : null;

@@ -75,6 +75,17 @@
   }
 }
 
+@keyframes is-leave {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
 @keyframes is-spin {
   to {
     transform: rotate(360deg);
@@ -101,6 +112,11 @@
   .motion-stagger > :nth-child(4) { animation-delay: 120ms; }
   .motion-stagger > :nth-child(5) { animation-delay: 160ms; }
   .motion-stagger > :nth-child(n + 6) { animation-delay: 200ms; }
+
+  /* Leaving a page after a completed action: the success state shows first (300 ms), then a 220 ms exit. */
+  .motion-leave {
+    animation: is-leave 220ms var(--is-ease-exit) 300ms both;
+  }
 
   /* Skeleton blocks (`bg/subtle`) pulse 1 → 0.6 → 1 (spec §9.5.2). */
   .motion-pulse {
@@ -138,7 +154,8 @@
   }
   .motion-enter,
   .motion-enter-fast,
-  .motion-stagger > * {
+  .motion-stagger > *,
+  .motion-leave {
     animation: none !important;
   }
   .motion-pulse,

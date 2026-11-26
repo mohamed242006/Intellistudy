@@ -1,6 +1,9 @@
 /**
  * Upload queue state (gate GF0B-14..17), as a pure reducer. One row per selected file, newest first (UI §18 D-13).
- * A row leaves the queue when the backend accepts its file: from then on the course's document list (polled) shows it.
+ * Selecting files only stages them (`selected`); "Add this file / Add these files" submits every staged file at once
+ * (`submit` → `pending`), and the scheduler uploads pending rows one at a time. A row leaves the queue when the backend
+ * accepts its file: from then on the course's document list (polled) shows it. `batch` follows the last submission so
+ * the page can tell success, partial failure and failure apart without guessing.
  */
 import type { FileRowStatus } from "@/design-system/components/FileUploadRow";
 import { ApiError } from "@/lib/api/errors";
@@ -14,16 +17,23 @@ export type UploadItem = {
   id: string;
   key: string;
   file: File;
-  phase: "pending" | "uploading" | "problem";
+  /** selected: staged, not sent until submitted; pending: submitted, waiting for its turn. */
+  phase: "selected" | "pending" | "uploading" | "problem";
   /** 0-100 while uploading. */
   progress: number;
   problem: RowProblem | null;
 };
 
-export type QueueState = { items: UploadItem[] };
+/** The last submission: which rows it contained and how many the backend accepted. */
+export type Batch = { ids: string[]; accepted: number };
+
+export type QueueState = { items: UploadItem[]; batch: Batch | null };
 
 export type QueueAction =
   | { type: "add"; files: File[]; makeId: () => string }
+  | { type: "submit" }
+  /** The content check refused a file that has not started uploading (a running transfer is never interrupted). */
+  | { type: "refused"; id: string; problem: RowProblem }
   | { type: "start"; id: string }
   | { type: "progress"; id: string; percent: number }
   | { type: "accepted"; id: string }
@@ -32,7 +42,7 @@ export type QueueAction =
   | { type: "retry"; id: string }
   | { type: "remove"; id: string };
 
-export const initialQueue: QueueState = { items: [] };
+export const initialQueue: QueueState = { items: [], batch: null };
 
 export function problemForClient(problem: ClientProblem): RowProblem {
   if (problem === "unsupported_type") return { status: "unsupported", message: FIGMA.notSupportedDetail, retryable: false };
@@ -65,7 +75,7 @@ export function problemForError(error: unknown): RowProblem {
 }
 
 function update(state: QueueState, id: string, fn: (item: UploadItem) => UploadItem): QueueState {
-  return { items: state.items.map((item) => (item.id === id ? fn(item) : item)) };
+  return { ...state, items: state.items.map((item) => (item.id === id ? fn(item) : item)) };
 }
 
 export function queueReducer(state: QueueState, action: QueueAction): QueueState {
@@ -82,12 +92,21 @@ export function queueReducer(state: QueueState, action: QueueAction): QueueState
           id: action.makeId(),
           key,
           file,
-          phase: problem ? "problem" : "pending",
+          phase: problem ? "problem" : "selected",
           progress: 0,
           problem: problem ? problemForClient(problem) : null,
         });
       }
-      return { items: [...added.reverse(), ...state.items] };
+      return { ...state, items: [...added.reverse(), ...state.items] };
+    }
+    case "submit": {
+      const staged = state.items.filter((item) => item.phase === "selected").map((item) => item.id);
+      if (staged.length === 0) return state;
+      const open = state.batch && batchProgress(state).active > 0 ? state.batch : null; // still uploading: extend it
+      return {
+        items: state.items.map((item) => (item.phase === "selected" ? { ...item, phase: "pending" } : item)),
+        batch: open ? { ids: [...open.ids, ...staged], accepted: open.accepted } : { ids: staged, accepted: 0 },
+      };
     }
     case "start":
       return update(state, action.id, (item) => ({ ...item, phase: "uploading", progress: 0, problem: null }));
@@ -97,11 +116,22 @@ export function queueReducer(state: QueueState, action: QueueAction): QueueState
       return update(state, action.id, (item) => ({ ...item, phase: "pending", progress: 0 }));
     case "problem":
       return update(state, action.id, (item) => ({ ...item, phase: "problem", progress: 0, problem: action.problem }));
+    case "refused":
+      return update(state, action.id, (item) =>
+        item.phase === "selected" || item.phase === "pending" ? { ...item, phase: "problem", progress: 0, problem: action.problem } : item,
+      );
     case "retry":
       return update(state, action.id, (item) => (item.problem?.retryable ? { ...item, phase: "pending", problem: null } : item));
     case "accepted":
+      return {
+        items: state.items.filter((item) => item.id !== action.id),
+        batch: state.batch && state.batch.ids.includes(action.id) ? { ...state.batch, accepted: state.batch.accepted + 1 } : state.batch,
+      };
     case "remove":
-      return { items: state.items.filter((item) => item.id !== action.id) };
+      return {
+        items: state.items.filter((item) => item.id !== action.id),
+        batch: state.batch ? { ...state.batch, ids: state.batch.ids.filter((id) => id !== action.id) } : null,
+      };
   }
 }
 
@@ -111,4 +141,18 @@ export function nextPending(state: QueueState): UploadItem | undefined {
     if (state.items[i]!.phase === "pending") return state.items[i];
   }
   return undefined;
+}
+
+/** Where the last submission stands: rows still on their way, rows the backend refused, rows it accepted. */
+export function batchProgress(state: QueueState): { active: number; failed: number; accepted: number; done: boolean } {
+  if (!state.batch) return { active: 0, failed: 0, accepted: 0, done: false };
+  const ids = new Set(state.batch.ids);
+  let active = 0;
+  let failed = 0;
+  for (const item of state.items) {
+    if (!ids.has(item.id)) continue;
+    if (item.phase === "pending" || item.phase === "uploading") active += 1;
+    else if (item.phase === "problem") failed += 1;
+  }
+  return { active, failed, accepted: state.batch.accepted, done: active === 0 && state.batch.accepted + failed > 0 };
 }

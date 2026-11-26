@@ -7,7 +7,7 @@ import { MAX_POLL_FAILURES, POLL_INTERVAL_MS, consecutiveFailures, newFailureTra
 import { documentActionError } from "@/features/documents/messages";
 import { EMPTY_CODES, IN_PROGRESS_STATUSES, TERMINAL_STATUSES, UNSUPPORTED_CODES, documentView, summarise } from "@/features/documents/status";
 import { BACKEND_REASONS } from "@/features/documents/strings";
-import { initialQueue, nextPending, problemForError, queueReducer } from "@/features/upload/queue";
+import { batchProgress, initialQueue, nextPending, problemForError, queueReducer } from "@/features/upload/queue";
 import { MAX_UPLOAD_BYTES, clientProblem, contentProblem, selectionKey } from "@/features/upload/validation";
 import { PROXY_BODY_LIMIT_BYTES } from "@/features/upload/limits";
 import nextConfig from "@/next.config";
@@ -150,7 +150,7 @@ describe("GF0B-14 client-side upload checks", () => {
     state = queueReducer(state, { type: "add", files: [sized("a.pdf", 10, 5)], makeId });
     expect(state.items.map((i) => [i.file.name, i.phase, i.problem?.status ?? null])).toEqual([
       ["b.txt", "problem", "unsupported"],
-      ["a.pdf", "pending", null],
+      ["a.pdf", "selected", null], // staged: nothing is uploaded until the reader adds the files
     ]);
     expect(selectionKey(a)).toBe(selectionKey(sized("a.pdf", 10, 5)));
   });
@@ -162,6 +162,8 @@ describe("GF0B-16 upload queue", () => {
     const makeId = () => `c${++ids}`;
     let state = queueReducer(initialQueue, { type: "add", files: [sized("1.pdf", 1), sized("2.pdf", 1)], makeId });
     state = queueReducer(state, { type: "add", files: [sized("3.pdf", 1)], makeId });
+    expect(nextPending(state)).toBeUndefined(); // staged rows never start on their own
+    state = queueReducer(state, { type: "submit" });
     expect(nextPending(state)?.file.name).toBe("1.pdf");
     state = queueReducer(state, { type: "start", id: nextPending(state)!.id });
     state = queueReducer(state, { type: "progress", id: "c1", percent: 40 });
@@ -169,6 +171,36 @@ describe("GF0B-16 upload queue", () => {
     expect(nextPending(state)?.file.name).toBe("2.pdf");
     state = queueReducer(state, { type: "accepted", id: "c1" });
     expect(state.items.map((i) => i.file.name)).toEqual(["3.pdf", "2.pdf"]);
+  });
+
+  it("ADD-01 submit stages → pending once; the batch reports success, partial failure and retry honestly", () => {
+    let ids = 0;
+    const makeId = () => `b${++ids}`;
+    let state = queueReducer(initialQueue, { type: "add", files: [sized("1.pdf", 1), sized("2.pdf", 1), sized("x.txt", 1)], makeId });
+    expect(batchProgress(state)).toEqual({ active: 0, failed: 0, accepted: 0, done: false });
+    expect(queueReducer(initialQueue, { type: "submit" })).toBe(initialQueue); // empty queue: nothing to submit
+    state = queueReducer(state, { type: "submit" });
+    expect([...(state.batch?.ids ?? [])].sort()).toEqual(["b1", "b2"]); // the refused .txt is not part of the submission
+    expect(batchProgress(state)).toMatchObject({ active: 2, done: false });
+    state = queueReducer(state, { type: "accepted", id: "b1" });
+    state = queueReducer(state, { type: "problem", id: "b2", problem: { status: "failed", message: "m", retryable: true } });
+    expect(batchProgress(state)).toEqual({ active: 0, failed: 1, accepted: 1, done: true }); // partial, never "success"
+    expect(state.items.map((i) => i.file.name)).toContain("2.pdf"); // the failed row stays
+    state = queueReducer(state, { type: "retry", id: "b2" });
+    expect(batchProgress(state)).toMatchObject({ active: 1, failed: 0, done: false });
+    state = queueReducer(state, { type: "accepted", id: "b2" });
+    expect(batchProgress(state)).toEqual({ active: 0, failed: 0, accepted: 2, done: true });
+  });
+
+  it("ADD-02 the content check refuses a staged file but never interrupts a running transfer", () => {
+    let state = queueReducer(initialQueue, { type: "add", files: [sized("a.pptx", 1), sized("b.pptx", 1)], makeId: (() => { let n = 0; return () => `r${++n}`; })() });
+    const problem = { status: "unsupported" as const, message: "m", retryable: false };
+    state = queueReducer(state, { type: "refused", id: "r1", problem });
+    expect(state.items.find((i) => i.id === "r1")?.phase).toBe("problem");
+    state = queueReducer(state, { type: "submit" });
+    state = queueReducer(state, { type: "start", id: "r2" });
+    state = queueReducer(state, { type: "refused", id: "r2", problem });
+    expect(state.items.find((i) => i.id === "r2")?.phase).toBe("uploading");
   });
 
   it("GF0B-16 retry is offered only for retryable problems; remove drops a row", () => {

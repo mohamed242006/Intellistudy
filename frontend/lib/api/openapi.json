@@ -793,6 +793,205 @@
         "title": "CourseOut",
         "type": "object"
       },
+      "CourseSummaryCreate": {
+        "additionalProperties": false,
+        "description": "The selected documents, in reading order. The service checks ownership, duplicates, the maximum and readiness,\nand answers with an explicit error instead of leaving any selected document out.",
+        "properties": {
+          "document_ids": {
+            "items": {
+              "maxLength": 64,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Document Ids",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "document_ids"
+        ],
+        "title": "CourseSummaryCreate",
+        "type": "object"
+      },
+      "CourseSummaryList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CourseSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "limit",
+          "offset"
+        ],
+        "title": "CourseSummaryList",
+        "type": "object"
+      },
+      "CourseSummaryOut": {
+        "properties": {
+          "chunk_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chunk Count"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/SummaryCitation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "course_id": {
+            "title": "Course Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "generated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "grounding": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grounding"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "boolean"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SummarySection"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "source_documents": {
+            "items": {
+              "$ref": "#/components/schemas/SourceFile"
+            },
+            "title": "Source Documents",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "generating",
+              "ready",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "course_id",
+          "title",
+          "status",
+          "pending",
+          "error_code",
+          "source_documents",
+          "sections",
+          "citations",
+          "warnings",
+          "grounding",
+          "chunk_count",
+          "model",
+          "generated_at",
+          "created_at"
+        ],
+        "title": "CourseSummaryOut",
+        "type": "object"
+      },
       "CourseUpdate": {
         "additionalProperties": false,
         "properties": {
@@ -1815,6 +2014,24 @@
         "title": "SavedAnswer",
         "type": "object"
       },
+      "SourceFile": {
+        "properties": {
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "file_name"
+        ],
+        "title": "SourceFile",
+        "type": "object"
+      },
       "SourceOut": {
         "properties": {
           "citation_label": {
@@ -2087,6 +2304,28 @@
             },
             "title": "Citations",
             "type": "array"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
           },
           "heading": {
             "title": "Heading",
@@ -3504,6 +3743,124 @@
         ]
       }
     },
+    "/api/v1/courses/{course_id}/summaries": {
+      "get": {
+        "operationId": "list_course_summaries_api_v1_courses__course_id__summaries_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "title": "Course Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseSummaryList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Course Summaries",
+        "tags": [
+          "summaries",
+          "quizzes"
+        ]
+      },
+      "post": {
+        "operationId": "request_course_summary_api_v1_courses__course_id__summaries_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "title": "Course Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CourseSummaryCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Course Summary",
+        "tags": [
+          "summaries",
+          "quizzes"
+        ]
+      }
+    },
     "/api/v1/documents/{document_id}": {
       "delete": {
         "operationId": "delete_document_api_v1_documents__document_id__delete",
@@ -4016,6 +4373,83 @@
           }
         },
         "summary": "Regenerate Quiz",
+        "tags": [
+          "summaries",
+          "quizzes"
+        ]
+      }
+    },
+    "/api/v1/summaries/{summary_id}": {
+      "delete": {
+        "operationId": "delete_course_summary_api_v1_summaries__summary_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "summary_id",
+            "required": true,
+            "schema": {
+              "title": "Summary Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Course Summary",
+        "tags": [
+          "summaries",
+          "quizzes"
+        ]
+      },
+      "get": {
+        "operationId": "get_course_summary_api_v1_summaries__summary_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "summary_id",
+            "required": true,
+            "schema": {
+              "title": "Summary Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Course Summary",
         "tags": [
           "summaries",
           "quizzes"

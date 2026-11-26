@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { ALICE, BOB, PASSWORD } from "./accounts";
+import { addMaterials } from "./support";
 
 /**
  * F1 end to end (docs/F1_GATE.md) against the isolated backend of scripts/e2e-backend.sh with the DETERMINISTIC TEST
@@ -127,8 +128,7 @@ test("GF1-01 GF1-02 GF1-03 GF1-06 a summary is generated from a processed file a
   await page.getByRole("button", { name: "Create course" }).click();
   await expect(page.getByRole("heading", { level: 1, name: COURSE })).toBeVisible();
   await page.getByRole("link", { name: "Add files" }).click();
-  await page.getByTestId("file-input").setInputFiles([join(fixtures, "lecture-notes.pdf"), join(fixtures, "hostile-text.pdf")]);
-  await expect(page.getByText("2 indexed · 0 in progress · 0 need attention")).toBeVisible({ timeout: 180_000 });
+  await addMaterials(page, [join(fixtures, "lecture-notes.pdf"), join(fixtures, "hostile-text.pdf")], "2 indexed · 0 in progress · 0 need attention");
   await page.getByRole("link", { name: "Open lecture-notes.pdf" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Summary: lecture-notes.pdf" })).toBeVisible();
   summaryUrl = new URL(page.url()).pathname;

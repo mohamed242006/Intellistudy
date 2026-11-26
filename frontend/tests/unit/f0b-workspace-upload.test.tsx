@@ -34,6 +34,8 @@ afterEach(() => {
 const DOCS = `GET /courses/${COURSE_ID}/documents`;
 const workspace = (search = "") => renderPage(<Workspace courseId={COURSE_ID} />, { shell: "rail", path: `/courses/${COURSE_ID}`, search });
 const upload = () => renderPage(<UploadPage courseId={COURSE_ID} />, { path: `/courses/${COURSE_ID}/upload` });
+/** Selecting files only stages them; the explicit "Add this file / Add these files" submits them. */
+const addFiles = async () => userEvent.click(await screen.findByRole("button", { name: /^Add (this file|these files)$/ }));
 const tick = async (ms = 2000) => act(async () => {
   vi.advanceTimersByTime(ms);
 });
@@ -359,6 +361,7 @@ describe("GF0B-15 GF0B-16 GF0B-17 upload flow", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Add materials" })).toBeVisible();
     const input = container.querySelector<HTMLInputElement>("input[type=file]")!;
     await user().upload(input, [pdf("a.pdf"), pdf("b.pdf"), new File(["PK\u0003\u0004x"], "c.pptx")]);
+    await addFiles();
     await waitFor(() => expect(FakeXHR.all).toHaveLength(1));
     expect(xhrFor("a.pdf")).toBeDefined();
     expect(screen.getAllByText("Waiting")).toHaveLength(2);
@@ -408,6 +411,7 @@ describe("GF0B-15 GF0B-16 GF0B-17 upload flow", () => {
     const { container } = upload();
     await screen.findByText("5 files");
     await user().upload(container.querySelector<HTMLInputElement>("input[type=file]")!, [pdf("next.pdf")]);
+    await addFiles();
     expect(await screen.findByText("Waiting for other files to finish processing…")).toBeVisible();
     expect(FakeXHR.all).toHaveLength(0);
     busy = [{ ...busy[0]!, status: "ready" }, ...busy.slice(1)];
@@ -425,6 +429,7 @@ describe("GF0B-15 GF0B-16 GF0B-17 upload flow", () => {
     const { container } = upload();
     await screen.findByText("0 files");
     await user().upload(container.querySelector<HTMLInputElement>("input[type=file]")!, [pdf("full.pdf")]);
+    await addFiles();
     await waitFor(() => expect(FakeXHR.all).toHaveLength(1));
     act(() => FakeXHR.all[0]!.respond(429, { type: "about:blank#queue_full" }));
     expect(await screen.findByText("Too many documents are still processing. Try again later.")).toBeVisible();
@@ -439,12 +444,14 @@ describe("GF0B-15 GF0B-16 GF0B-17 upload flow", () => {
     await screen.findByText("0 files");
     const input = container.querySelector<HTMLInputElement>("input[type=file]")!;
     await user().upload(input, [pdf("big.pdf")]);
+    await addFiles();
     await waitFor(() => expect(FakeXHR.all).toHaveLength(1));
     await userEvent.click(screen.getByRole("button", { name: "Cancel upload of big.pdf" }));
     expect(FakeXHR.all[0]!.aborted).toBe(true);
     await waitFor(() => expect(screen.queryByText("big.pdf")).toBeNull());
 
     await user().upload(input, [pdf("flaky.pdf")]);
+    await addFiles();
     await waitFor(() => expect(FakeXHR.all).toHaveLength(2));
     act(() => FakeXHR.all[1]!.fail());
     expect(await screen.findByText("Upload failed. Check your connection and try again.")).toBeVisible();
@@ -458,6 +465,7 @@ describe("GF0B-15 GF0B-16 GF0B-17 upload flow", () => {
     const { container } = upload();
     await screen.findByText("0 files");
     await user().upload(container.querySelector<HTMLInputElement>("input[type=file]")!, [pdf("1.pdf"), pdf("2.pdf")]);
+    await addFiles();
     await waitFor(() => expect(FakeXHR.all).toHaveLength(1));
     act(() => FakeXHR.all[0]!.respond(429, { type: "about:blank#rate_limited" }, { "Retry-After": "600" }));
     expect(await screen.findByText("Too many uploads in the last hour. Try again in 10 minutes.")).toBeVisible();
@@ -473,6 +481,7 @@ describe("GF0B-15 GF0B-16 GF0B-17 upload flow", () => {
     const { container } = upload();
     await screen.findByText("1 file");
     await user().upload(container.querySelector<HTMLInputElement>("input[type=file]")!, [pdf("same-copy.pdf"), pdf("huge.pdf")]);
+    await addFiles();
     await waitFor(() => expect(FakeXHR.all).toHaveLength(1));
     act(() => FakeXHR.all[0]!.respond(202, { documents: [{ ...existing, duplicate: true }] }));
     expect(await screen.findByText("“same.pdf” is already in this course.")).toBeVisible();
@@ -517,6 +526,7 @@ describe("GF0B-15 GF0B-16 GF0B-17 upload flow", () => {
     const drop = new Event("drop", { bubbles: true }) as Event & { dataTransfer: { files: File[] } };
     Object.assign(drop, { dataTransfer: { files: [pdf("dropped.pdf")] } });
     act(() => zone.dispatchEvent(drop));
+    await addFiles();
     await waitFor(() => expect(xhrFor("dropped.pdf")).toBeDefined());
   });
 });

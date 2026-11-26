@@ -10,6 +10,7 @@ import { useToast } from "@/design-system/components/Toast";
 import { Breadcrumb } from "@/design-system/compositions/Breadcrumb";
 import { FormAlert } from "@/features/auth/components/FormAlert";
 import { useCourse } from "@/features/courses/hooks";
+import { useDocuments } from "@/features/documents/hooks";
 import { FIGMA as COURSE_FIGMA } from "@/features/courses/strings";
 import { ResourceNotFound } from "@/features/shell/components/ResourceNotFound";
 import { ApiError } from "@/lib/api/errors";
@@ -40,6 +41,7 @@ function QuizPageInner({ quizId }: { quizId: string }) {
   const now = useNow();
   const quiz = useQuiz(quizId);
   const course = useCourse(quiz.data?.course_id ?? "", { enabled: Boolean(quiz.data) });
+  const files = useDocuments(quiz.data?.course_id ?? "", { poll: false, enabled: Boolean(quiz.data) });
   const attempts = useAttempts(quizId, { enabled: quiz.isSuccess });
   const start = useStartAttempt(quizId);
   const regenerate = useRegenerateQuiz(quizId);
@@ -95,6 +97,7 @@ function QuizPageInner({ quizId }: { quizId: string }) {
             <QuizStatusTag status={data.status} />
             {data.status === "ready" ? <span className="text-body-sm text-fg-secondary">{PROVISIONAL.questionsCount(data.question_count)}</span> : null}
           </span>
+          <SourceFiles ids={data.source_document_ids} names={new Map(files.documents.map((d) => [d.id, d.file_name]))} />
         </div>
         <div className="flex flex-wrap gap-3">
           {data.status === "ready" ? (
@@ -203,5 +206,17 @@ function QuizPageInner({ quizId }: { quizId: string }) {
         <FormAlert message={regenerate.isError ? quizError(regenerate.error) : remove.isError ? quizError(remove.error) : null} />
       </Modal>
     </div>
+  );
+}
+
+/** The files this quiz was written from (its stored sources), so a multi-file quiz says which files it covers. */
+function SourceFiles({ ids, names }: { ids: readonly string[]; names: ReadonlyMap<string, string> }) {
+  const known = ids.map((id) => names.get(id)).filter((name): name is string => Boolean(name));
+  if (!known.length) return null;
+  return (
+    <p className="min-w-0 text-body-sm wrap-anywhere text-fg-secondary">
+      <span className="text-caption-strong">{ids.length === 1 ? "SOURCE FILE: " : `${ids.length} SOURCE FILES: `}</span>
+      {known.join(" · ")}
+    </p>
   );
 }

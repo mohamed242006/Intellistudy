@@ -9,17 +9,20 @@ import { Icon } from "../icons/Icon";
  * padding 4/24/24/64, one bullet row per statement (6×6 dot in `text/tertiary`). The whole header is the toggle
  * (`aria-expanded`), and the heading text is the button's name.
  */
-export function SummarySection({ heading, caption, statements, defaultExpanded }: {
+export function SummarySection({ heading, caption, statements, defaultExpanded, headingLevel = 2 }: {
   heading: string;
   caption: string;
   statements: ReactNode[];
   defaultExpanded: boolean;
+  /** 3 when the sections sit under a per-file heading (combined summaries). */
+  headingLevel?: 2 | 3;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const Heading = headingLevel === 3 ? "h3" : "h2";
   const bodyId = useId();
   return (
     <section className="rounded-lg border border-line bg-surface">
-      <h2 className="m-0">
+      <Heading className="m-0">
         <button
           type="button"
           aria-expanded={expanded}
@@ -33,7 +36,7 @@ export function SummarySection({ heading, caption, statements, defaultExpanded }
           <span className="min-w-0 flex-1 text-title break-words text-fg">{heading}</span>
           <span className="shrink-0 text-caption text-fg-secondary">{caption}</span>
         </button>
-      </h2>
+      </Heading>
       <div id={bodyId} hidden={!expanded} className="motion-enter-fast">
         <ul className="flex flex-col gap-3 pt-1 pr-6 pb-6 pl-16 max-md:pl-6">
           {statements.map((statement, index) => (

@@ -84,6 +84,24 @@ It uses the repository's `.venv` Python when present; set `E2E_PYTHON` to choose
   only the status spinner keeps turning. Playwright runs with reduced motion so the accessibility checks see final
   frames.
 
+## Adding materials, summaries and quizzes from several files
+
+- **Add materials.** Choosing or dropping files only stages them; every check (type, size, signature) runs right
+  away. "Add this file" / "Add these files" submits the staged files, which upload one at a time. When the backend has
+  accepted every file, the page shows a short success state, fades out (220 ms after 300 ms; no animation under reduced
+  motion) and opens the course workspace with `router.push`, where processing continues visibly. If some files fail,
+  the page shows how many were added and how many failed, keeps the failed rows (Retry, Remove) and offers "Continue
+  with uploaded files". Leaving with staged or uploading files asks first: a dialog for links inside the app, the
+  browser prompt for reloads. The browser's Back button is not intercepted.
+- **File selection.** `features/documents/components/DocumentPicker.tsx` (logic in `features/documents/selection.ts`)
+  is the one selector for Summary and Quiz. Only ready files can be selected, at most 20.
+- **Summaries.** `/courses/{id}/summaries` creates a summary: one file uses that file's own summary
+  (`POST /documents/{id}/summary`, unchanged); two or more create one combined summary
+  (`POST /courses/{id}/summaries` with `{"document_ids": [...]}`), shown at `/summaries/{id}` with sections grouped
+  by file.
+- **Quizzes.** `POST /courses/{id}/quizzes` always sends the explicit `document_ids`. `?document=<id>` still
+  preselects a file on both pages.
+
 ## Generated files
 
 | File | Source | Regenerate |

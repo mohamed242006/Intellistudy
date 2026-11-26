@@ -18,6 +18,8 @@ export const queryKeys = {
   documentList: (courseId: string, limit: number = DOCUMENT_PAGE_SIZE) => ["documents", courseId, { limit }] as const,
   document: (documentId: string) => ["document", documentId] as const,
   summary: (documentId: string) => ["summary", documentId] as const,
+  courseSummariesOf: (courseId: string) => ["course-summaries", courseId] as const,
+  courseSummary: (summaryId: string) => ["course-summary", summaryId] as const,
   conversationsOf: (courseId: string) => ["conversations", courseId] as const,
   conversationList: (courseId: string, limit: number = CONVERSATION_PAGE_SIZE) => ["conversations", courseId, { limit }] as const,
   conversation: (conversationId: string) => ["conversation", conversationId] as const,

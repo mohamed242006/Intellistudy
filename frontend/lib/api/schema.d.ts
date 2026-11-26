@@ -337,6 +337,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/courses/{course_id}/summaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Course Summaries */
+        get: operations["list_course_summaries_api_v1_courses__course_id__summaries_get"];
+        put?: never;
+        /** Request Course Summary */
+        post: operations["request_course_summary_api_v1_courses__course_id__summaries_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}": {
         parameters: {
             query?: never;
@@ -475,6 +493,24 @@ export interface paths {
         /** Regenerate Quiz */
         post: operations["regenerate_quiz_api_v1_quizzes__quiz_id__regenerate_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/summaries/{summary_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Course Summary */
+        get: operations["get_course_summary_api_v1_summaries__summary_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Course Summary */
+        delete: operations["delete_course_summary_api_v1_summaries__summary_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -751,6 +787,67 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * CourseSummaryCreate
+         * @description The selected documents, in reading order. The service checks ownership, duplicates, the maximum and readiness,
+         *     and answers with an explicit error instead of leaving any selected document out.
+         */
+        CourseSummaryCreate: {
+            /** Document Ids */
+            document_ids: string[];
+            /** Title */
+            title?: string | null;
+        };
+        /** CourseSummaryList */
+        CourseSummaryList: {
+            /** Items */
+            items: components["schemas"]["CourseSummaryOut"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** CourseSummaryOut */
+        CourseSummaryOut: {
+            /** Chunk Count */
+            chunk_count: number | null;
+            /** Citations */
+            citations: components["schemas"]["SummaryCitation"][];
+            /** Course Id */
+            course_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error Code */
+            error_code: string | null;
+            /** Generated At */
+            generated_at: string | null;
+            /** Grounding */
+            grounding: {
+                [key: string]: number;
+            } | null;
+            /** Id */
+            id: string;
+            /** Model */
+            model: string | null;
+            /** Pending */
+            pending: boolean;
+            /** Sections */
+            sections: components["schemas"]["SummarySection"][];
+            /** Source Documents */
+            source_documents: components["schemas"]["SourceFile"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "generating" | "ready" | "failed";
+            /** Title */
+            title: string;
+            /** Warnings */
+            warnings: string[];
         };
         /** CourseUpdate */
         CourseUpdate: {
@@ -1081,6 +1178,13 @@ export interface components {
              */
             saved_at: string;
         };
+        /** SourceFile */
+        SourceFile: {
+            /** Document Id */
+            document_id: string;
+            /** File Name */
+            file_name: string;
+        };
         /** SourceOut */
         SourceOut: {
             /** Citation Label */
@@ -1167,6 +1271,10 @@ export interface components {
         SummarySection: {
             /** Citations */
             citations: number[];
+            /** Document Id */
+            document_id?: string | null;
+            /** File Name */
+            file_name?: string | null;
             /** Heading */
             heading: string;
             source_range: components["schemas"]["SourceRange"] | null;
@@ -2074,6 +2182,75 @@ export interface operations {
             };
         };
     };
+    list_course_summaries_api_v1_courses__course_id__summaries_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                course_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseSummaryList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_course_summary_api_v1_courses__course_id__summaries_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                course_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CourseSummaryCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_document_api_v1_documents__document_id__get: {
         parameters: {
             query?: never;
@@ -2444,6 +2621,66 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["QuizOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_course_summary_api_v1_summaries__summary_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                summary_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_course_summary_api_v1_summaries__summary_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                summary_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

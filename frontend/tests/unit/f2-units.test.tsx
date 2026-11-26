@@ -18,7 +18,7 @@ import { resultQuestion } from "../helpers/f2-data";
 
 const REPO = join(process.cwd(), "..");
 const read = (path: string) => readFileSync(join(REPO, path), "utf8");
-const form = (overrides: Partial<QuizForm> = {}): QuizForm => ({ title: "", count: "10", mcq: true, trueFalse: true, scope: "all", documents: [], ...overrides });
+const form = (overrides: Partial<QuizForm> = {}): QuizForm => ({ title: "", count: "10", mcq: true, trueFalse: true, documents: ["doc-0"], ...overrides });
 const READY = Array.from({ length: 25 }, (_, i) => ({ id: `doc-${i}` }));
 
 describe("GF2-03 generation form", () => {
@@ -30,8 +30,10 @@ describe("GF2-03 generation form", () => {
     expect(read("backend/app/services/generation.py")).toContain("MAX_QUIZ_DOCUMENTS = 20");
     expect([MIN_QUESTIONS, MAX_QUESTIONS, MAX_QUIZ_DOCUMENTS]).toEqual([5, 30, 20]);
 
-    expect(validateQuizForm(form(), READY)).toEqual({ request: { question_count: 10, question_types: ["mcq", "true_false"] }, errors: {} });
-    expect(validateQuizForm(form({ title: "  Midterm  ", mcq: false, scope: "some", documents: ["doc-1", "foreign"] }), READY).request).toEqual({
+    // the selection is always explicit: "Select all ready files" sends every ready id, each once
+    expect(validateQuizForm(form(), READY)).toEqual({ request: { question_count: 10, question_types: ["mcq", "true_false"], document_ids: ["doc-0"] }, errors: {} });
+    expect(validateQuizForm(form({ documents: ["doc-2", "doc-1", "doc-2"] }), READY).request?.document_ids).toEqual(["doc-2", "doc-1"]);
+    expect(validateQuizForm(form({ title: "  Midterm  ", mcq: false, documents: ["doc-1", "foreign"] }), READY).request).toEqual({
       title: "Midterm",
       question_count: 10,
       question_types: ["true_false"],
@@ -40,8 +42,9 @@ describe("GF2-03 generation form", () => {
     for (const count of ["4", "31", "", "7.5", "1e1", "abc"]) expect(validateQuizForm(form({ count }), READY).errors.count, count).toBeDefined();
     expect(validateQuizForm(form({ mcq: false, trueFalse: false }), READY).errors.types).toBeDefined();
     expect(validateQuizForm(form({ title: "x".repeat(201) }), READY).errors.title).toBeDefined();
-    expect(validateQuizForm(form({ scope: "some", documents: [] }), READY).errors.files).toBeDefined();
-    expect(validateQuizForm(form({ scope: "some", documents: READY.slice(0, 21).map((d) => d.id) }), READY).errors.files).toBeDefined();
+    expect(validateQuizForm(form({ documents: [] }), READY).errors.files).toBeDefined();
+    expect(validateQuizForm(form({ documents: ["foreign"] }), READY).errors.files).toBeDefined();
+    expect(validateQuizForm(form({ documents: READY.slice(0, 21).map((d) => d.id) }), READY).errors.files).toBeDefined();
   });
 });
 

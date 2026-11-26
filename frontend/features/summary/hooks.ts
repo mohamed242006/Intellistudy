@@ -4,12 +4,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { MAX_POLL_FAILURES, MAX_POLL_DELAY_MS, POLL_INTERVAL_MS, consecutiveFailures, newFailureTracker } from "@/features/documents/polling";
-import type { SummaryOut } from "@/lib/api/types";
+import type { CourseSummaryOut, SummaryOut } from "@/lib/api/types";
 import { queryKeys } from "@/lib/query/keys";
-import { getSummary, requestSummary } from "./api";
+import { createCourseSummary, deleteCourseSummary, getCourseSummary, getSummary, listCourseSummaries, requestSummary } from "./api";
 
 /** Poll while a generation is queued or running (`pending`), with the same bounded backoff as document polling. */
-export function summaryPollDelay(summary: SummaryOut | null | undefined, failures: number): number | false {
+export function summaryPollDelay(summary: Pick<SummaryOut, "pending"> | null | undefined, failures: number): number | false {
   if (!summary?.pending || failures >= MAX_POLL_FAILURES) return false;
   return Math.min(POLL_INTERVAL_MS * 2 ** failures, MAX_POLL_DELAY_MS);
 }
@@ -40,5 +40,57 @@ export function useRequestSummary(documentId: string) {
   return useMutation({
     mutationFn: (regenerate: boolean) => requestSummary(documentId, regenerate),
     onSuccess: (summary) => client.setQueryData(queryKeys.summary(documentId), summary),
+  });
+}
+
+/** A combined summary; polled while it is being generated, like a single summary. */
+export function useCourseSummary(summaryId: string, { enabled }: { enabled: boolean }) {
+  const tracker = useRef(newFailureTracker());
+  const result = useQuery({
+    queryKey: queryKeys.courseSummary(summaryId),
+    queryFn: ({ signal }) => getCourseSummary(summaryId, signal),
+    enabled,
+    refetchInterval: (query) => summaryPollDelay(query.state.data, consecutiveFailures(tracker.current, query.state)),
+    refetchIntervalInBackground: false,
+  });
+  const failures = consecutiveFailures(tracker.current, { dataUpdatedAt: result.dataUpdatedAt, errorUpdateCount: result.errorUpdateCount });
+  return {
+    ...result,
+    pollingStopped: Boolean(result.data?.pending) && failures >= MAX_POLL_FAILURES,
+    resumePolling: () => {
+      tracker.current.errorsAtSuccess = result.errorUpdateCount;
+      void result.refetch();
+    },
+  };
+}
+
+export function useCourseSummaries(courseId: string, { enabled }: { enabled: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.courseSummariesOf(courseId),
+    queryFn: ({ signal }) => listCourseSummaries(courseId, signal),
+    enabled,
+  });
+}
+
+/** POST once with the explicit selection. Never retried automatically; the caller keeps the selection on failure. */
+export function useCreateCourseSummary(courseId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (documentIds: readonly string[]) => createCourseSummary(courseId, documentIds),
+    onSuccess: (summary: CourseSummaryOut) => {
+      client.setQueryData(queryKeys.courseSummary(summary.id), summary);
+      void client.invalidateQueries({ queryKey: queryKeys.courseSummariesOf(courseId) });
+    },
+  });
+}
+
+export function useDeleteCourseSummary(courseId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (summaryId: string) => deleteCourseSummary(summaryId),
+    onSuccess: (_, summaryId) => {
+      client.removeQueries({ queryKey: queryKeys.courseSummary(summaryId) });
+      void client.invalidateQueries({ queryKey: queryKeys.courseSummariesOf(courseId) });
+    },
   });
 }
