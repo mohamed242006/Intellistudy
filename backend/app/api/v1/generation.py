@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from backend.app.api.deps import CurrentUser, DbSession
 from backend.app.api.v1.schemas import RequestModel
-from backend.app.db.models import Quiz, QuizQuestion
+from backend.app.db.models import CourseSummary, Quiz, QuizQuestion
 from backend.app.services.generation import MAX_QUIZ_DOCUMENTS, GenerationService
 from backend.app.services.quizgen import MAX_QUESTIONS, MIN_QUESTIONS
 
@@ -47,6 +47,9 @@ class SummarySection(BaseModel):
     text: str
     citations: list[int]
     source_range: SourceRange | None
+    #: the document this section summarises (absent in summaries stored before combined summaries existed)
+    document_id: str | None = None
+    file_name: str | None = None
 
 
 class SummaryCitation(BaseModel):
@@ -85,6 +88,84 @@ def request_summary(document_id: Id, user: CurrentUser, session: DbSession, serv
     code, view = service.request_summary(session, user, document_id, regenerate=body.regenerate)
     response.status_code = code
     return SummaryOut(**view)
+
+
+# --------------------------------------------------------------------------------------- combined summaries
+class CourseSummaryCreate(RequestModel):
+    """The selected documents, in reading order. The service checks ownership, duplicates, the maximum and readiness,
+    and answers with an explicit error instead of leaving any selected document out."""
+
+    document_ids: Annotated[list[Annotated[str, StringConstraints(max_length=64)]], Field(min_length=1, max_length=100)]
+    title: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
+
+
+class SourceFile(BaseModel):
+    document_id: str
+    file_name: str
+
+
+class CourseSummaryOut(BaseModel):
+    id: str
+    course_id: str
+    title: str
+    status: Literal["generating", "ready", "failed"]
+    pending: bool
+    error_code: str | None
+    source_documents: list[SourceFile]
+    sections: list[SummarySection]
+    citations: list[SummaryCitation]
+    warnings: list[str]
+    grounding: dict[str, int] | None
+    chunk_count: int | None
+    model: str | None
+    generated_at: datetime | None
+    created_at: datetime
+
+
+class CourseSummaryList(BaseModel):
+    items: list[CourseSummaryOut]
+    limit: int
+    offset: int
+
+
+def _course_summary(session: Any, user: Any, service: GenerationService, summary: CourseSummary) -> CourseSummaryOut:
+    ids = service.course_summary_sources(session, summary)
+    names = service.source_files(session, user, ids)
+    return CourseSummaryOut(
+        id=summary.id, course_id=summary.course_id, title=summary.title, status=summary.status,
+        pending=summary.status == "generating", error_code=summary.error_code,
+        source_documents=[SourceFile(document_id=d, file_name=names.get(d, "")) for d in ids],
+        sections=summary.sections, citations=summary.citations, warnings=summary.warnings,
+        grounding=summary.grounding, chunk_count=summary.chunk_count, model=summary.model,
+        generated_at=summary.generated_at, created_at=summary.created_at)
+
+
+@router.post("/courses/{course_id}/summaries", status_code=status.HTTP_202_ACCEPTED, response_model=CourseSummaryOut)
+def request_course_summary(course_id: Id, body: CourseSummaryCreate, user: CurrentUser, session: DbSession,
+                           service: Generation, response: Response) -> CourseSummaryOut:
+    code, summary = service.request_course_summary(session, user, course_id, body.document_ids, body.title)
+    response.status_code = code
+    return _course_summary(session, user, service, summary)
+
+
+@router.get("/courses/{course_id}/summaries", response_model=CourseSummaryList)
+def list_course_summaries(course_id: Id, user: CurrentUser, session: DbSession, service: Generation,
+                          limit: Annotated[int, Query(ge=1, le=100)] = 50,
+                          offset: Annotated[int, Query(ge=0, le=100_000)] = 0) -> CourseSummaryList:
+    items = service.list_course_summaries(session, user, course_id, limit=limit, offset=offset)
+    return CourseSummaryList(items=[_course_summary(session, user, service, s) for s in items], limit=limit,
+                             offset=offset)
+
+
+@router.get("/summaries/{summary_id}", response_model=CourseSummaryOut)
+def get_course_summary(summary_id: Id, user: CurrentUser, session: DbSession, service: Generation) -> CourseSummaryOut:
+    return _course_summary(session, user, service, service.get_course_summary(session, user, summary_id))
+
+
+@router.delete("/summaries/{summary_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_course_summary(summary_id: Id, user: CurrentUser, session: DbSession, service: Generation) -> Response:
+    service.delete_course_summary(session, user, summary_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # -------------------------------------------------------------------------------------------------- quizzes

@@ -25,6 +25,10 @@ from backend.app.core.config import Settings
 from backend.app.core.errors import ApiError, not_found
 from backend.app.core.ratelimit import LIMITS, RateLimiter, enforce
 from backend.app.db.models import (
+    Course,
+    CourseSummary,
+    CourseSummarySource,
+    CourseSummaryStatus,
     Document,
     DocumentStatus,
     GenerationJob,
@@ -52,6 +56,8 @@ logger = logging.getLogger(__name__)
 
 ACTIVE = (JobStatus.QUEUED.value, JobStatus.RUNNING.value)
 MAX_QUIZ_DOCUMENTS = 20
+#: documents in one combined summary: the same ceiling as a quiz; the token budget estimate bounds the total text
+MAX_SUMMARY_DOCUMENTS = 20
 QUIZ_NOTICE = "Your materials supported {count} good questions instead of the {requested} requested."
 
 
@@ -143,6 +149,87 @@ class GenerationService:
                         grounding=stored.grounding, chunk_count=stored.chunk_count, model=stored.model,
                         generated_at=stored.generated_at)
         return view
+
+    # ------------------------------------------------------------------------------- combined summaries
+    def request_course_summary(self, session: Session, user: User, course_id: str, document_ids: Sequence[str],
+                               title: str | None) -> tuple[int, CourseSummary]:
+        """One summary grounded in several documents. Checked in order: ownership of the course (404) -> every id
+        canonical, owned, in this course and not being deleted (one generic 404, no hint which) -> no duplicates
+        (422) -> at most MAX_SUMMARY_DOCUMENTS (422) -> every document ready (409) -> an identical generation in
+        flight is reused (200) -> provider, rate limit, token budget (as a single summary) -> job queued (202)."""
+        course, _ = self._scoped.resolve_scope(session, user, course_id, None)
+        requested = list(document_ids)
+        if len(set(requested)) != len(requested):
+            raise ApiError(422, "Each document can be selected only once.", code="duplicate_documents")
+        if not requested:
+            raise ApiError(422, "Select at least one document.", code="validation_error")
+        if len(requested) > MAX_SUMMARY_DOCUMENTS:
+            raise ApiError(422, f"Select at most {MAX_SUMMARY_DOCUMENTS} documents for one summary.",
+                           code="too_many_documents")
+        owned = {d.id: d for d in session.scalars(select(Document).where(
+            Document.owner_id == user.id, Document.course_id == course.id, Document.id.in_(requested),
+            Document.status != DocumentStatus.DELETING.value))}
+        if any(d not in owned for d in requested):
+            raise not_found()
+        if any(owned[d].status != DocumentStatus.READY.value for d in requested):
+            raise ApiError(409, "A selected document is not ready.", code="document_not_ready")
+        existing = self._active_course_summary(session, user, course.id, requested)
+        if existing is not None:
+            return 200, existing  # a repeated request does not start a second generation (CAC-02)
+        self._admit(session, user, LIMITS["summary:user"])
+        sections = [s for d in requested for s in load_sections(session, self._ai, user.id, course.id, d)]
+        self._ledger.check(session, user.id, estimated=summaries.estimate_tokens(
+            sections, self._settings.summary_batch_tokens, self._settings.summary_max_tokens))
+        names = [owned[d].file_name for d in requested]
+        default_title = f"Summary of {len(requested)} files" if len(requested) > 1 else f"Summary of {names[0]}"
+        summary = CourseSummary(owner_id=user.id, course_id=course.id, title=((title or "").strip() or default_title)[:200],
+                                status=CourseSummaryStatus.GENERATING.value, sections=[], citations=[], warnings=[])
+        session.add(summary)
+        session.flush()
+        session.add_all(CourseSummarySource(summary_id=summary.id, owner_id=user.id, document_id=d, position=i)
+                        for i, d in enumerate(requested))
+        session.add(GenerationJob(owner_id=user.id, course_id=course.id, kind=GenerationKind.COURSE_SUMMARY.value,
+                                  course_summary_id=summary.id, status=JobStatus.QUEUED.value))
+        session.commit()
+        self._runner.notify()
+        return 202, summary
+
+    def _active_course_summary(self, session: Session, user: User, course_id: str, document_ids: Sequence[str]
+                               ) -> CourseSummary | None:
+        wanted = list(document_ids)
+        for candidate in session.scalars(select(CourseSummary).where(
+                CourseSummary.owner_id == user.id, CourseSummary.course_id == course_id,
+                CourseSummary.status == CourseSummaryStatus.GENERATING.value)):
+            if self.course_summary_sources(session, candidate) == wanted:
+                return candidate
+        return None
+
+    def course_summary_sources(self, session: Session, summary: CourseSummary) -> list[str]:
+        return list(session.scalars(select(CourseSummarySource.document_id).where(
+            CourseSummarySource.summary_id == summary.id).order_by(CourseSummarySource.position)))
+
+    def get_course_summary(self, session: Session, user: User, summary_id: str) -> CourseSummary:
+        return get_owned(session, CourseSummary, summary_id, user.id, resource="summary")
+
+    def list_course_summaries(self, session: Session, user: User, course_id: str, *, limit: int, offset: int
+                              ) -> list[CourseSummary]:
+        course = get_owned(session, Course, course_id, user.id, resource="course")
+        return list(session.scalars(select(CourseSummary).where(
+            CourseSummary.owner_id == user.id, CourseSummary.course_id == course.id)
+            .order_by(CourseSummary.created_at.desc(), CourseSummary.id).limit(limit).offset(offset)))
+
+    def delete_course_summary(self, session: Session, user: User, summary_id: str) -> None:
+        summary = get_owned(session, CourseSummary, summary_id, user.id, resource="summary")
+        session.delete(summary)  # sources and its job cascade
+        session.commit()
+
+    def source_files(self, session: Session, user: User, document_ids: Sequence[str]) -> dict[str, str]:
+        """Current file names of owned documents (for the summary's source list)."""
+        if not document_ids:
+            return {}
+        rows = session.execute(select(Document.id, Document.file_name).where(
+            Document.owner_id == user.id, Document.id.in_(list(document_ids))))
+        return {row[0]: row[1] for row in rows}
 
     # -------------------------------------------------------------------------------------------- quizzes
     def create_quiz(self, session: Session, user: User, course_id: str, *, document_ids: Sequence[str] | None,
@@ -306,13 +393,15 @@ class GenerationRunner:
             if job is None:
                 return
             owner_id, course_id, kind = job.owner_id, job.course_id, job.kind
-            document_id, quiz_id = job.document_id, job.quiz_id
+            document_id, quiz_id, course_summary_id = job.document_id, job.quiz_id, job.course_summary_id
         code = ""
         try:
             if kind == GenerationKind.SUMMARY.value and document_id:
                 self._summary(job_id, owner_id, course_id, document_id)
             elif kind == GenerationKind.QUIZ.value and quiz_id:
                 code = self._quiz(job_id, owner_id, course_id, quiz_id)
+            elif kind == GenerationKind.COURSE_SUMMARY.value and course_summary_id:
+                code = self._course_summary(job_id, owner_id, course_id, course_summary_id)
             else:
                 raise _Discard
         except _Discard:
@@ -329,7 +418,7 @@ class GenerationRunner:
             logger.error("generation job %s failed: %s", job_id, type(exc).__name__)
             code = "internal_error"
         if code:
-            self._fail(job_id, quiz_id, code)
+            self._fail(job_id, quiz_id, code, course_summary_id)
         else:
             self._finish(job_id, JobStatus.DONE)
 
@@ -364,6 +453,40 @@ class GenerationRunner:
             session.execute(update(GenerationJob).where(GenerationJob.id == job_id).values(
                 status=JobStatus.DONE.value, finished_at=self._clock.now()))
             session.commit()  # the old summary is replaced in this one transaction (CAC-03)
+
+    # ---------------------------------------------------------------------------- combined summary job
+    def _course_summary(self, job_id: str, owner_id: str, course_id: str, summary_id: str) -> str:
+        """Every section of every selected document, in the chosen order, through the same grounded map step as a
+        single summary (batches never mix documents). Returns a failure code, or "" once the result is stored."""
+        settings = self._settings
+        with self._sessions() as session:
+            document_ids = list(session.scalars(select(CourseSummarySource.document_id).where(
+                CourseSummarySource.summary_id == summary_id, CourseSummarySource.owner_id == owner_id)
+                .order_by(CourseSummarySource.position)))
+            if not document_ids:
+                raise _Discard  # the summary was deleted meanwhile
+            try:
+                sections = [s for d in document_ids for s in load_sections(session, self._ai, owner_id, course_id, d)]
+            except SourceUnavailable:
+                return "document_not_ready"
+            result = summaries.summarize(sections, self._llm(session, owner_id, UsageFeature.SUMMARY),
+                                         batch_tokens=settings.summary_batch_tokens,
+                                         max_tokens=settings.summary_max_tokens)
+            session.expire_all()
+            if not _still_ready(session, owner_id, course_id, document_ids):
+                return "document_not_ready"  # a source changed meanwhile: nothing partial is stored (DEL-04)
+            stored = session.scalars(select(CourseSummary).where(CourseSummary.id == summary_id,
+                                                                 CourseSummary.owner_id == owner_id)).one_or_none()
+            if stored is None:
+                raise _Discard
+            stored.sections, stored.citations, stored.warnings = result.sections, result.citations, result.warnings
+            stored.grounding, stored.chunk_count, stored.model = result.grounding, result.chunk_count, result.model
+            stored.generated_at = self._clock.now()
+            stored.status, stored.error_code = CourseSummaryStatus.READY.value, None
+            session.execute(update(GenerationJob).where(GenerationJob.id == job_id).values(
+                status=JobStatus.DONE.value, finished_at=self._clock.now()))
+            session.commit()
+        return ""
 
     # ------------------------------------------------------------------------------------------- quiz job
     def _quiz(self, job_id: str, owner_id: str, course_id: str, quiz_id: str) -> str:
@@ -418,10 +541,14 @@ class GenerationRunner:
             return ""
 
     # ------------------------------------------------------------------------------------------- helpers
-    def _fail(self, job_id: str, quiz_id: str | None, code: str) -> None:
+    def _fail(self, job_id: str, quiz_id: str | None, code: str, course_summary_id: str | None = None) -> None:
         with self._sessions() as session:
             session.execute(update(GenerationJob).where(GenerationJob.id == job_id).values(
                 status=JobStatus.FAILED.value, error_code=code, finished_at=self._clock.now()))
+            if course_summary_id:
+                session.execute(update(CourseSummary).where(
+                    CourseSummary.id == course_summary_id, CourseSummary.status == CourseSummaryStatus.GENERATING.value)
+                    .values(status=CourseSummaryStatus.FAILED.value, error_code=code))
             if quiz_id:
                 session.execute(update(Quiz).where(Quiz.id == quiz_id, Quiz.status == QuizStatus.GENERATING.value)
                                 .values(status=QuizStatus.FAILED.value, error_code=code))

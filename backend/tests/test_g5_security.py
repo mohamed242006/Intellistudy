@@ -46,6 +46,10 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("POST", "/api/v1/conversations/{conversation_id}/messages"): {"question": "What do mitochondria produce?"},
     ("GET", "/api/v1/documents/{document_id}/summary"): None,
     ("POST", "/api/v1/documents/{document_id}/summary"): {},
+    ("POST", "/api/v1/courses/{course_id}/summaries"): {"document_ids": ["00000000-0000-4000-8000-000000000000"]},
+    ("GET", "/api/v1/courses/{course_id}/summaries"): None,
+    ("GET", "/api/v1/summaries/{summary_id}"): None,
+    ("DELETE", "/api/v1/summaries/{summary_id}"): None,
     ("POST", "/api/v1/courses/{course_id}/quizzes"): {"question_count": 5},
     ("GET", "/api/v1/courses/{course_id}/quizzes"): None,
     ("GET", "/api/v1/quizzes/{quiz_id}"): None,
@@ -81,9 +85,14 @@ class SecurityCase(M5Case):
         conversation = self.a.post(f"/api/v1/courses/{self.a_course}/conversations", json={},
                                    headers=self.bearer(self.a_token))
         self.assertEqual(conversation.status_code, 201, conversation.text)
+        combined = self.a.post(f"/api/v1/courses/{self.a_course}/summaries", headers=self.bearer(self.a_token),
+                               json={"document_ids": [self.doc_cells, self.doc_nerves]})
+        self.assertEqual(combined.status_code, 202, combined.text)
+        self.generate()
         self.ids = {"course_id": self.a_course, "document_id": self.doc_cells,
                     "conversation_id": conversation.json()["id"], "quiz_id": self.quiz["id"],
-                    "attempt_id": self.current["id"], "question_id": self.current["questions"][0]["id"]}
+                    "attempt_id": self.current["id"], "question_id": self.current["questions"][0]["id"],
+                    "summary_id": combined.json()["id"]}
 
     def operations(self) -> set[tuple[str, str]]:
         spec = self.app.openapi()
@@ -193,7 +202,7 @@ class SecurityVerificationTests(SecurityCase):
                 with self.subTest(model=name):
                     self.assertIs(spec["components"]["schemas"][name].get("additionalProperties"), False)
                 bodies.append((method.upper(), path))
-        self.assertEqual(len(bodies), 10)
+        self.assertEqual(len(bodies), 11)  # + POST /courses/{course_id}/summaries (combined summaries)
         for method, path in bodies:
             body = {**ROUTES[(method, path)], "unexpected_field": 1}
             with self.subTest(route=f"{method} {path}"):

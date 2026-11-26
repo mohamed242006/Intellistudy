@@ -230,6 +230,8 @@ class LlmUsage(UUIDPrimaryKey, Base):
 class GenerationKind(StrEnum):
     SUMMARY = "summary"
     QUIZ = "quiz"
+    #: one summary grounded in several documents of a course (CourseSummary)
+    COURSE_SUMMARY = "course_summary"
 
 
 class GenerationJob(UUIDPrimaryKey, Timestamps, Base):
@@ -245,6 +247,8 @@ class GenerationJob(UUIDPrimaryKey, Timestamps, Base):
     document_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("documents.id", ondelete="CASCADE"),
                                                     nullable=True)
     quiz_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=True)
+    course_summary_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("course_summaries.id",
+                                                                                ondelete="CASCADE"), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default=JobStatus.QUEUED.value)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -270,6 +274,49 @@ class Summary(UUIDPrimaryKey, Timestamps, Base):
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False)
     model: Mapped[str] = mapped_column(String(100), nullable=False)
     generated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class CourseSummaryStatus(StrEnum):
+    GENERATING = "generating"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class CourseSummary(UUIDPrimaryKey, Timestamps, Base):
+    """One summary grounded in several ready documents of one course (migration 0008). Every section and citation
+    keeps the document it came from. Deleted with any of its source documents, as a single-document summary is (T-1):
+    it contains that document's text."""
+
+    __tablename__ = "course_summaries"
+    __table_args__ = (Index("ix_course_summaries_owner_id", "owner_id"), Index("ix_course_summaries_course_id", "course_id"))
+
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    course_id: Mapped[str] = mapped_column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default=CourseSummaryStatus.GENERATING.value)
+    error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    sections: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False, default=list)
+    citations: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False, default=list)
+    warnings: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    grounding: Mapped[dict[str, int] | None] = mapped_column(JSON, nullable=True)
+    chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    generated_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class CourseSummarySource(UUIDPrimaryKey, Base):
+    """A source document of a combined summary, in the order the reader chose. ``document_id`` is not a foreign key,
+    like :class:`QuizSource`: deleting the document runs the deletion rule (delete the combined summary)."""
+
+    __tablename__ = "course_summary_sources"
+    __table_args__ = (Index("ix_course_summary_sources_summary_id", "summary_id"),
+                      Index("ix_course_summary_sources_document_id", "document_id"))
+
+    summary_id: Mapped[str] = mapped_column(String(36), ForeignKey("course_summaries.id", ondelete="CASCADE"),
+                                            nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    document_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class QuizStatus(StrEnum):

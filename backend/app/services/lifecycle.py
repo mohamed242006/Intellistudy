@@ -10,6 +10,8 @@ from backend.app.db.models import (
     AttemptAnswer,
     AttemptResult,
     AttemptStatus,
+    CourseSummary,
+    CourseSummarySource,
     Document,
     GenerationJob,
     JobStatus,
@@ -50,6 +52,15 @@ def on_document_purged(session: Session, document: Document) -> None:
     """Team decisions T-1..T-3, applied before the document row is deleted (same transaction as the caller's)."""
     session.execute(delete(Summary).where(Summary.document_id == document.id))  # T-1
     session.execute(delete(GenerationJob).where(GenerationJob.document_id == document.id))
+    # T-1 for combined summaries: they contain this document's text, so they are deleted with it (jobs, sources first,
+    # explicitly, whatever the database's cascade does).
+    combined = select(CourseSummarySource.summary_id).where(CourseSummarySource.document_id == document.id,
+                                                             CourseSummarySource.owner_id == document.owner_id)
+    summary_ids = set(session.scalars(combined))
+    if summary_ids:
+        session.execute(delete(GenerationJob).where(GenerationJob.course_summary_id.in_(summary_ids)))
+        session.execute(delete(CourseSummarySource).where(CourseSummarySource.summary_id.in_(summary_ids)))
+        session.execute(delete(CourseSummary).where(CourseSummary.id.in_(summary_ids)))
     quiz_ids = set(session.scalars(select(QuizSource.quiz_id).where(QuizSource.document_id == document.id,
                                                                     QuizSource.owner_id == document.owner_id)))
     for quiz_id in quiz_ids:

@@ -62,12 +62,13 @@ class SummaryResult:
 
 
 def batches(sections: list[Section], batch_tokens: int) -> list[list[Section]]:
-    """Consecutive, non-overlapping batches covering every section exactly once (FR-SUM-05)."""
+    """Consecutive, non-overlapping batches covering every section exactly once (FR-SUM-05). A batch never mixes
+    documents: a combined summary's model calls each see one document's text, as the prompt states."""
     out: list[list[Section]] = []
     current: list[Section] = []
     size = 0
     for section in sections:
-        if current and size + section.tokens > batch_tokens:
+        if current and (size + section.tokens > batch_tokens or section.document_id != current[-1].document_id):
             out.append(current)
             current, size = [], 0
         current.append(section)
@@ -95,7 +96,7 @@ def summarize(sections: list[Section], llm: Any, *, batch_tokens: int, max_token
         raise GenerationFailed("ungrounded")
     by_key = {s.key: s for s in sections}
     numbers: dict[str, int] = {}
-    blocks: list[tuple[str, list[tuple[str, list[str]]]]] = []  # (heading, [(sentence, [section keys])])
+    blocks: list[tuple[str, str, list[tuple[str, list[str]]]]] = []  # (document, heading, [(sentence, [keys])])
     warnings: list[str] = []
     checked = supported = removed = 0
     plan: list[list[str]] = []
@@ -127,13 +128,16 @@ def summarize(sections: list[Section], llm: Any, *, batch_tokens: int, max_token
                 continue
             anchor = bundle.by_tag(header_tag) if header_tag else None
             heading_key = anchor.chunk_id if anchor is not None else sentences[0][1][0]
-            blocks.append((by_key[heading_key].heading, sentences))
+            blocks.append((by_key[heading_key].document_id, by_key[heading_key].heading, sentences))
+    files = {s.document_id: s.file_name for s in sections}
     sections_out: list[dict[str, Any]] = []
-    for heading, sentences in blocks:
-        if sections_out and sections_out[-1]["heading"] == heading:  # neighbouring parts of one section
-            sections_out[-1]["_sentences"].extend(sentences)
+    for document_id, heading, sentences in blocks:
+        last = sections_out[-1] if sections_out else None
+        if last is not None and last["heading"] == heading and last["document_id"] == document_id:
+            last["_sentences"].extend(sentences)  # neighbouring parts of one section of one document
         else:
-            sections_out.append({"heading": heading, "_sentences": list(sentences)})
+            sections_out.append({"heading": heading, "document_id": document_id, "file_name": files[document_id],
+                                 "_sentences": list(sentences)})
     if not sections_out:
         raise GenerationFailed("ungrounded")
     for section in sections_out:
