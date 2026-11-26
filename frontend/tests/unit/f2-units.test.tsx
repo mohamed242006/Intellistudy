@@ -169,3 +169,13 @@ describe("GF2-28 deterministic quiz provider", () => {
     expect(readFileSync(join(process.cwd(), "tests", "e2e", "fixtures", "make_fixtures.py"), "utf8")).toContain('"quiz-notes.pdf"');
   });
 });
+
+describe("GF2-29 CI regression: document title", () => {
+  it("GF2-29 metadata is rendered blocking in <head> for every user agent, so client navigations never drop the <title>", () => {
+    const config = readFileSync(join(process.cwd(), "next.config.ts"), "utf8");
+    expect(config).toContain("htmlLimitedBots: /.*/,");
+    const spec = readFileSync(join(process.cwd(), "tests", "e2e", "courses.spec.ts"), "utf8");
+    expect(spec).toContain('expect(await titleGaps(page), "the document title is never missing after load").toEqual([]);');
+    expect(spec).toContain(`expect(payload, "metadata must not be streamed as a deferred row").not.toContain('{"metadata":');`);
+  });
+});

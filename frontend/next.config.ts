@@ -31,6 +31,10 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Render metadata (the document <title>) blocking, in <head>, for every user agent instead of streaming it after the
+  // page. With streamed metadata, client navigations inside a dynamic route (for example ?file= in the workspace)
+  // removed the <title> for a moment, a WCAG 2.4.2 gap that axe caught on the slower CI runner (frontend run #5).
+  htmlLimitedBots: /.*/,
   async rewrites() {
     return [{ source: "/api/v1/:path*", destination: `${apiOrigin()}/api/v1/:path*` }];
   },

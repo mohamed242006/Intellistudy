@@ -72,7 +72,20 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
     dialogs.push(dialog.message());
     await dialog.dismiss();
   });
+  // WCAG 2.4.2: once a page has loaded, its <title> must never be missing, also during client navigations (frontend
+  // CI run #5 caught Next's streamed metadata removing it for a moment; next.config.ts htmlLimitedBots fixes that).
+  await page.addInitScript(() => {
+    const gaps: string[] = [];
+    (window as unknown as { __titleGaps: string[] }).__titleGaps = gaps;
+    new MutationObserver(() => {
+      if (document.readyState === "complete" && !document.title) gaps.push(location.pathname + location.search);
+    }).observe(document, { subtree: true, childList: true, characterData: true });
+  });
 });
+
+async function titleGaps(target: Page): Promise<string[]> {
+  return target.evaluate(() => (window as unknown as { __titleGaps?: string[] }).__titleGaps ?? []);
+}
 
 test.afterAll(async () => {
   await context?.close();
@@ -170,7 +183,13 @@ test("GF0B-10 GF0B-22 GF0B-28 the workspace shows real stats and downloads the o
   // Since F1 an Indexed row's "Open" goes to the Summary (as in the prototype); the workspace selects files itself.
   await expect(row(page, "handout.docx").getByRole("link", { name: "Open handout.docx" })).toHaveAttribute("href", /\/documents\/[0-9a-f-]{36}\/summary$/);
   await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: COURSE }).click();
+  // WCAG 2.4.2 (frontend CI run #5): a client navigation's real RSC response carries the <title> inline, never as a
+  // deferred metadata row that would leave the page without a title until it resolves (next.config.ts htmlLimitedBots).
+  const navigation = page.waitForResponse((r) => r.request().headers()["rsc"] === "1" && r.url().includes("?file="));
   await page.getByRole("region", { name: "Materials" }).getByRole("link", { name: /handout\.docx/ }).click();
+  const payload = await (await navigation).text();
+  expect(payload).toContain('"title","0",{"children":"IntelliStudy"}');
+  expect(payload, "metadata must not be streamed as a deferred row").not.toContain('{"metadata":');
   await expect(page).toHaveURL(new RegExp(`${courseUrl}\\?file=`));
   await expect(page.getByText("3 of 5")).toBeVisible();
   await expect(page.getByText("2 failed")).toBeVisible();
@@ -204,6 +223,7 @@ test("GF0B-21 a document is deleted only after confirmation", async () => {
   const dialog = page.getByRole("dialog", { name: "Delete this file?" });
   await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
   expect(await seriousViolations(page), "Delete file dialog").toEqual([]);
+  expect(await titleGaps(page), "the document title is never missing after load").toEqual([]);
   const deleted = page.waitForResponse((r) => r.request().method() === "DELETE" && r.url().includes("/documents/"));
   await dialog.getByRole("button", { name: "Delete file" }).click();
   expect((await deleted).status()).toBe(204);

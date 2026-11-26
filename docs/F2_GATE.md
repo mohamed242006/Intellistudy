@@ -290,7 +290,7 @@ F2 is complete only after the local checks pass, the user pushes the commit, and
 | ruff (backend, AI, tests, E2E fixtures) | clean |
 | Backend regression (no backend file changed) | 402 tests OK; the quiz and attempt suites alone (`test_g4_quizzes`, `test_g5_*`): 83 OK |
 | Real provider | **not run**; no automated test calls DeepSeek or any real model |
-| CI | pending the push |
+| CI | `c3deb4c`: backend workflow #21 **green**; frontend workflow #5 **failed** in E2E (see below). The fix is in the follow-up commit; **GF2-29 stays open** until that push is green in both workflows |
 
 **Probe of the real contract (isolated backend, before the UI):**
 - **Generation:** `POST` 202 → `generating` → `ready` with 6 questions (validation dropped one stub candidate,
@@ -303,5 +303,34 @@ F2 is complete only after the local checks pass, the user pushes the commit, and
 - **Retry missed:** 201 with only the missed questions.
 - **Not found:** random and malformed ids: the same 404.
 
+**Frontend CI run #5 (`c3deb4c`) failure and fix:**
+- **Failing step:** `npx playwright test`.
+- **First failure:** GF0B-21, axe `document-title: html`. The page had no `<title>` when axe ran on the delete-file
+  dialog.
+- **Consequences, not separate causes:**
+  - F0-B stopped there, so GF0B-11 (which registers the run's second account) never ran;
+  - the F1 and F2 specs then could not sign in with it (`unknown_email`);
+  - the `rate_limited` log line comes from those repeated sign-in attempts.
+- **Cause:** Next.js 15 streams page metadata for normal browsers. In a client navigation's RSC payload the title
+  arrived as a deferred row (`"$@c"` → `c:{"metadata":[…title…]}`), so the document could be without a title until
+  that row resolved. This is a real, brief WCAG 2.4.2 gap.
+- **Why local runs passed:** the gap is timing-dependent. A local browser probe saw it once in 10 workspace
+  navigations, then not again in 60, even with the browser CPU throttled 6×. The slower CI runner hit it during axe.
+- **Fix:** `next.config.ts` sets `htmlLimitedBots: /.*/`, so metadata is rendered blocking for every user agent. The
+  navigation payload then carries the `<title>` inline, with no deferred metadata row.
+- **Regression checks:**
+  - the F0-B E2E reads the real RSC response of a workspace navigation and requires the inline title and no
+    `{"metadata":` row;
+  - a page observer reports any moment a loaded page has no title;
+  - a unit test pins the config.
+- **Verified locally:**
+  - with the fix removed, the new check fails (GF0B-10, "metadata must not be streamed as a deferred row");
+  - with it, the F0-B spec passes 11/11;
+  - a CI-like run passes **35/35**: a git-tracked-only copy, a fresh `npm ci`, `CI=true`, and a Hugging Face cache
+    holding only the two models CI fetches;
+  - in the repository: Vitest **220/220**, E2E **35/35 twice**, plus lint, type-check, audit, build and drift all
+    clean.
+- **Unchanged:** the backend, the tests' assertions and every timeout.
+
 **Not verified here:** a real screen-reader audit, real-model question quality (manual demo only), final mobile
-fidelity, and the CI run.
+fidelity, and the CI run of the fix.
