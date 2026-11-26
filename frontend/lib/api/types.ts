@@ -14,3 +14,13 @@ export type DocumentOut = components["schemas"]["DocumentOut"];
 export type DocumentList = components["schemas"]["DocumentList"];
 export type UploadResponse = components["schemas"]["UploadResponse"];
 export type UploadedDocument = components["schemas"]["UploadedDocument"];
+
+export type SummaryOut = components["schemas"]["SummaryOut"];
+export type SummarySectionOut = components["schemas"]["SummarySection"];
+export type SummaryCitation = components["schemas"]["SummaryCitation"];
+export type ConversationOut = components["schemas"]["ConversationOut"];
+export type ConversationDetail = components["schemas"]["ConversationDetail"];
+export type ConversationList = components["schemas"]["ConversationList"];
+export type MessageOut = components["schemas"]["MessageOut"];
+export type CitationOut = components["schemas"]["CitationOut"];
+export type SourceOut = components["schemas"]["SourceOut"];

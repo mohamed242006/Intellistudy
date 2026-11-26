@@ -20,6 +20,8 @@ export const FIGMA = {
   remove: "Remove",
   cancel: "Cancel",
   open: "Open",
+  openSummary: "Open summary",
+  askMaterials: "Ask your materials",
   addFiles: "Add files",
   uploadFiles: "Upload files",
   materials: "Materials",

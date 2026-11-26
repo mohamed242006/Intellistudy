@@ -2,6 +2,11 @@
 # tests, static security checks, dependency audit, production build; then end-to-end tests against a real backend and
 # an OpenAPI drift check. Since F0-B the E2E backend runs its processing worker (uploads reach real terminal states), so
 # the E2E job also needs Tesseract (as in backend.yml) and the embedding model, which is cached between runs.
+# F1 (docs/F1_GATE.md GF1-26, GF1-27): the E2E backend uses the DETERMINISTIC TEST PROVIDER
+# (frontend/tests/e2e/fixtures/stub_llm.py on 127.0.0.1) through the backend's `local` provider slot: no key, no real
+# model, no network. playwright.config.ts gives explicit ports; scripts/e2e-frontend.sh builds Next.js only with an
+# explicit backend origin (never :8000) and checks the built rewrite; INTELLISTUDY_E2E=1 makes next.config.ts refuse
+# a build without one. The embedding model is fetched in its own step, then loaded offline during the run.
 # The backend workflow (backend.yml) is unchanged and still runs on every push.
 name: frontend
 
@@ -44,6 +49,7 @@ jobs:
     needs: checks
     env:
       NEXT_TELEMETRY_DISABLED: "1"
+      INTELLISTUDY_E2E: "1"
       PYTHONDONTWRITEBYTECODE: "1"
       E2E_PYTHON: python
     steps:

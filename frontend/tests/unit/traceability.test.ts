@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const FRONTEND = process.cwd();
 const GATE = readFileSync(join(FRONTEND, "..", "docs", "F0A_GATE.md"), "utf8");
 const GATE_B = readFileSync(join(FRONTEND, "..", "docs", "F0B_GATE.md"), "utf8");
+const GATE_F1 = readFileSync(join(FRONTEND, "..", "docs", "F1_GATE.md"), "utf8");
 const WORKFLOW = readFileSync(join(FRONTEND, "..", ".github", "workflows", "frontend.yml"), "utf8");
 
 function testTitles(): string {
@@ -55,5 +56,20 @@ describe("gate traceability", () => {
     const backend = readFileSync(join(FRONTEND, "..", ".github", "workflows", "backend.yml"), "utf8");
     expect(backend).toContain("python -m unittest discover -s backend/tests -t .");
     expect(readFileSync(join(FRONTEND, "scripts", "e2e-backend.sh"), "utf8")).toContain('INTELLISTUDY_WORKER_ENABLED="${E2E_WORKER_ENABLED:-true}"');
+  });
+
+  it("every F1 gate item has at least one test that names it", () => {
+    const ids = [...GATE_F1.matchAll(/^\| (GF1-\d{2}) \|/gm)].map((m) => m[1]!);
+    expect(ids.length).toBe(27);
+    const titles = testTitles();
+    const missing = ids.filter((id) => id !== "GF1-27" && !new RegExp(`(it|test|describe)\\(\\s*"[^"]*${id}`).test(titles));
+    expect(missing).toEqual([]);
+  });
+
+  it("GF1-27 the frontend CI keeps every check and runs the isolated E2E with the deterministic provider", () => {
+    for (const step of ["npm ci", "npm run lint", "npm run typecheck", "npm test", "npm audit --audit-level=high", "npm run build", "npx playwright test", "git diff --exit-code -- lib/api/openapi.json lib/api/schema.d.ts", "tesseract-ocr", "INTELLISTUDY_E2E: \"1\"", "DETERMINISTIC TEST PROVIDER"]) {
+      expect(WORKFLOW, step).toContain(step);
+    }
+    expect(WORKFLOW).not.toMatch(/DEEPSEEK_API_KEY|OPENAI_API_KEY|secrets\.(?!GITHUB_TOKEN)/);
   });
 });

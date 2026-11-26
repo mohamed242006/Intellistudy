@@ -8,7 +8,7 @@ import type { DocumentList, DocumentOut } from "@/lib/api/types";
 import { DOCUMENT_PAGE_SIZE, queryKeys } from "@/lib/query/keys";
 import { nextOffset } from "@/features/courses/hooks";
 import { deleteDocument, downloadDocument, getDocument, listDocuments, retryDocument } from "./api";
-import { MAX_POLL_FAILURES, consecutiveFailures, newFailureTracker, pollDelay } from "./polling";
+import { MAX_POLL_FAILURES, POLL_INTERVAL_MS, consecutiveFailures, newFailureTracker, pollDelay } from "./polling";
 import { isInProgress } from "./status";
 
 type Pages = InfiniteData<DocumentList, number>;
@@ -49,11 +49,20 @@ export function useDocuments(courseId: string, { poll, enabled = true }: { poll:
 }
 
 /** A single document, used only for a `?file=` id that is not in the loaded pages. */
-export function useDocument(documentId: string | null, enabled: boolean) {
+export function useDocument(documentId: string | null, enabled: boolean, { live = false }: { live?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.document(documentId ?? ""),
     queryFn: ({ signal }) => getDocument(documentId!, signal),
     enabled: enabled && documentId !== null,
+    // `live` (Summary page, F1): always re-read on mount (a cached copy may predate processing) and poll while the
+    // document is still processing, so the page moves from "not ready" to the summary by itself.
+    ...(live
+      ? {
+          refetchOnMount: "always" as const,
+          refetchInterval: (query: { state: { data?: DocumentOut } }) => (query.state.data && isInProgress(query.state.data.status) ? POLL_INTERVAL_MS : false),
+          refetchIntervalInBackground: false,
+        }
+      : {}),
   });
 }
 

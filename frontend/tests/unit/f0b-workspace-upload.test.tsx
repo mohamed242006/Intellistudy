@@ -60,7 +60,9 @@ describe("GF0B-10 Course Workspace", () => {
     expect(within(details).getByText("48")).toBeVisible();
     expect(within(details).getByRole("button", { name: "Download" })).toBeVisible();
     expect(within(details).queryByRole("button", { name: "Retry" })).toBeNull();
-    expect(document.body.textContent).not.toMatch(/mastery|Topics found|OCR|Ask your materials|Generate quiz/i);
+    expect(document.body.textContent).not.toMatch(/mastery|Topics found|OCR|Generate quiz/i);
+    expect(screen.getByRole("link", { name: "Ask your materials" })).toHaveAttribute("href", `/courses/${COURSE_ID}/chat`);
+    expect(within(details).getByRole("link", { name: "Open summary" })).toHaveAttribute("href", `/courses/${COURSE_ID}/documents/${ready.id}/summary`);
     expect(screen.getAllByRole("link", { name: "Courses" }).some((a) => a.getAttribute("aria-current") === "page")).toBe(true);
   });
 
@@ -489,7 +491,7 @@ describe("GF0B-15 GF0B-16 GF0B-17 upload flow", () => {
       });
     upload();
     expect(await screen.findByText("This file has no readable text, so there is nothing to index.")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Open ok.pdf" })).toHaveAttribute("href", `/courses/${COURSE_ID}?file=${ready.id}`);
+    expect(screen.getByRole("link", { name: "Open ok.pdf" })).toHaveAttribute("href", `/courses/${COURSE_ID}/documents/${ready.id}/summary`);
     await userEvent.click(screen.getByRole("button", { name: "Remove blank.pdf" }));
     await userEvent.click(within(screen.getByRole("dialog", { name: "Delete this file?" })).getByRole("button", { name: "Delete file" }));
     await waitFor(() => expect(screen.queryByText("blank.pdf")).toBeNull());

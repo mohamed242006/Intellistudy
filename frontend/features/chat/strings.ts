@@ -1,0 +1,76 @@
+/**
+ * Chat copy. FIGMA = UI §7.20, §7.21, §8.6. BACKEND_NOTICES = backend/app/services/chat.py NOTICES, mirrored and checked
+ * by a test. PROVISIONAL = not drawn (docs/F1_GATE.md section 6).
+ */
+export const FIGMA = {
+  newConversation: "New conversation",
+  assistant: "IntelliStudy",
+  answeredFrom: (n: number) => `Answered from ${n === 1 ? "1 file" : `${n} files`}`,
+  partlyFrom: (n: number) => `Partly answered from ${n === 1 ? "1 file" : `${n} files`}`,
+  notFound: "Not found in your materials",
+  working: "Working",
+  refusedTitle: "I couldn’t find this in your materials",
+  partialTitle: "Only part of your question is covered",
+  lowConfidenceTitle: "Low confidence",
+  sources: "SOURCES",
+  composerLabel: "Ask a question about your materials",
+  placeholder: "Ask a question about your materials…",
+  loadingPlaceholder: "Searching your materials…",
+  send: "Send",
+  answering: "Answering…",
+  disclaimer: "Answers come only from your uploaded files. Check the cited page before relying on them.",
+  scope: (n: number) => `Searching all ${n === 1 ? "1 file" : `${n} files`} in this course`,
+  searching: (n: number) => `Searching ${n === 1 ? "1 file" : `${n} files`}…`,
+} as const;
+
+/** Exactly backend/app/services/chat.py NOTICES (straight apostrophes as written there). */
+export const BACKEND_NOTICES: Readonly<Record<string, string>> = {
+  no_results: "Nothing in your ready documents for this course matches the question.",
+  not_relevant: "Your materials don't cover this question, so no answer was generated.",
+  model_declined: "The sources don't contain enough information to answer this.",
+  uncited_answer: "An answer could not be backed by your materials, so it was withheld.",
+  unsupported_claims: "The draft answer was not supported by your materials, so it was withheld.",
+  llm_unavailable: "The answering service is unavailable right now. Try again later.",
+  scope_violation: "The answer was withheld because it referenced material outside this course.",
+  partial: "Only part of your question is covered by your materials.",
+  low_confidence: "Check the cited passages before relying on this answer.",
+};
+
+export const PROVISIONAL = {
+  conversations: "Conversations",
+  updated: (when: string) => `Updated ${when}`,
+  showMore: "Show more conversations",
+  emptyTitle: "No conversations yet",
+  emptyBody: "Ask a question and IntelliStudy answers only from this course’s ready files, with a citation for every statement.",
+  emptyConversation: "Ask your first question below.",
+  deleteConversation: "Delete conversation",
+  deleteTitle: "Delete this conversation?",
+  deleteBody: "This removes its questions and answers. This can’t be undone.",
+  cancel: "Cancel",
+  conversationDeleted: "Conversation deleted.",
+  unavailableCaption: "Not answered",
+  unavailableTitle: "The answering service is unavailable",
+  withheldTitle: "No answer was given",
+  missing: (terms: string) => `Not found in your materials: ${terms}.`,
+  closestMaterial: "CLOSEST MATERIAL",
+  unknownState: "This answer has a status this page doesn’t know, so it is shown without any claim about its sources.",
+  messages: "Messages",
+  you: "You",
+  questionTooLong: "Use 2000 characters or fewer.",
+  questionEmpty: "Type a question first.",
+  loadError: "Couldn’t load the conversations.",
+  conversationError: "Couldn’t load this conversation.",
+  tryAgain: "Try again",
+  noReadyFiles: "No file of this course is ready yet. Answers use processed files only.",
+} as const;
+
+/** Fixed copy for a failed send or action; never the problem body (GF1-16). */
+export const SEND_ERRORS = {
+  invalid_question: "Ask a question of 1-2000 characters.",
+  rate_limited: (wait: string) => `You’ve asked many questions in the last minute. Try again ${wait}.`,
+  token_budget: "Your daily AI budget is used up. Try again tomorrow.",
+  network: "You appear to be offline. Your question is kept; send it again when you’re back online.",
+  not_found: "This conversation no longer exists.",
+  session_expired: "Your session expired. Sign in again.",
+  fallback: "The question couldn’t be sent. Try again.",
+} as const;

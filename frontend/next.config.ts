@@ -9,6 +9,10 @@ import type { NextConfig } from "next";
  * Rewrites are resolved when the server starts (`next dev`) or at build time (`next build`).
  */
 function apiOrigin(): string {
+  // An end-to-end build must name its throwaway backend; it never falls back to the development backend (F1 gate).
+  if (process.env.INTELLISTUDY_E2E === "1" && !process.env.INTELLISTUDY_API_ORIGIN) {
+    throw new Error("INTELLISTUDY_API_ORIGIN must be set for an end-to-end build");
+  }
   const raw = process.env.INTELLISTUDY_API_ORIGIN ?? "http://127.0.0.1:8000";
   const url = new URL(raw);
   if (url.protocol !== "http:" && url.protocol !== "https:") {

@@ -16,12 +16,17 @@ import { IconButton } from "./IconButton";
  */
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function Modal({ open, title, description, children, footer, onClose, busy = false, initialFocus, closeLabel = "Close dialog" }: {
+export function Modal({ open, title, description, children, footer, onClose, busy = false, initialFocus, closeLabel = "Close dialog", variant = "dialog" }: {
   open: boolean;
+  /**
+   * `sheet`: the mobile bottom sheet (UI §7.23: full width, radius 16 at the top, grabber 40×4, shadow/lg, over the
+   * 45% scrim), used as the provisional narrow-screen source view (F1). Same focus and Escape rules as a dialog.
+   */
+  variant?: "dialog" | "sheet";
   title: string;
   description?: string;
   children?: ReactNode;
-  footer: ReactNode;
+  footer?: ReactNode;
   onClose: () => void;
   /** While true (a request is in flight) Escape and the close button do nothing. */
   busy?: boolean;
@@ -81,8 +86,8 @@ export function Modal({ open, title, description, children, footer, onClose, bus
 
   if (!open || typeof document === "undefined") return null;
   return createPortal(
-    <div data-modal-root className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div aria-hidden="true" className="absolute inset-0 bg-scrim/45" />
+    <div data-modal-root className={`fixed inset-0 z-50 flex justify-center ${variant === "sheet" ? "items-end" : "items-center p-4"}`}>
+      <div aria-hidden="true" className="absolute inset-0 bg-scrim/45" onClick={() => variant === "sheet" && !busy && onClose()} />
       <div
         ref={panel}
         role="dialog"
@@ -90,8 +95,14 @@ export function Modal({ open, title, description, children, footer, onClose, bus
         aria-labelledby={titleId}
         aria-describedby={description ? bodyId : undefined}
         tabIndex={-1}
-        className="relative flex max-h-[calc(100vh-32px)] w-[480px] max-w-full flex-col gap-4 overflow-y-auto rounded-xl border border-line bg-raised p-6 shadow-lg outline-none"
+        data-variant={variant}
+        className={
+          variant === "sheet"
+            ? "relative flex max-h-[80vh] w-full flex-col gap-3 overflow-y-auto rounded-t-xl bg-surface px-4 pt-2 pb-6 shadow-lg outline-none"
+            : "relative flex max-h-[calc(100vh-32px)] w-[480px] max-w-full flex-col gap-4 overflow-y-auto rounded-xl border border-line bg-raised p-6 shadow-lg outline-none"
+        }
       >
+        {variant === "sheet" ? <span aria-hidden="true" className="mx-auto h-1 w-10 shrink-0 rounded-full bg-line-strong" /> : null}
         <div className="flex items-start justify-between gap-4">
           <h2 id={titleId} className="pt-2 text-h3 break-words text-fg">
             {title}
@@ -104,7 +115,7 @@ export function Modal({ open, title, description, children, footer, onClose, bus
           </p>
         ) : null}
         {children}
-        <div className="flex flex-wrap justify-end gap-3">{footer}</div>
+        {footer ? <div className="flex flex-wrap justify-end gap-3">{footer}</div> : null}
       </div>
     </div>,
     document.body,

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { ALICE, BOB, PASSWORD } from "./accounts";
 
 /**
  * F0-B end to end (docs/F0B_GATE.md) against the real backend of scripts/e2e-backend.sh: fresh database, processing
@@ -14,9 +15,6 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 test.describe.configure({ mode: "serial" });
 
 const REPO = resolve(__dirname, "..", "..", "..");
-const PASSWORD = "lectures4ever-f0b";
-const ALICE = { name: "Alice Student", email: `alice-${Date.now()}@example.org` };
-const BOB = { name: "Bob Student", email: `bob-${Date.now()}@example.org` };
 const COURSE = "Queueing Theory";
 const HOSTILE_COURSE = "<script>alert(1)</script>";
 const HOSTILE_RENAME = "javascript:alert(1)";
@@ -169,7 +167,10 @@ test("GF0B-10 GF0B-17 reload shows the persisted server data", async () => {
 });
 
 test("GF0B-10 GF0B-22 GF0B-28 the workspace shows real stats and downloads the original file", async () => {
-  await row(page, "handout.docx").getByRole("link", { name: "Open handout.docx" }).click();
+  // Since F1 an Indexed row's "Open" goes to the Summary (as in the prototype); the workspace selects files itself.
+  await expect(row(page, "handout.docx").getByRole("link", { name: "Open handout.docx" })).toHaveAttribute("href", /\/documents\/[0-9a-f-]{36}\/summary$/);
+  await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: COURSE }).click();
+  await page.getByRole("region", { name: "Materials" }).getByRole("link", { name: /handout\.docx/ }).click();
   await expect(page).toHaveURL(new RegExp(`${courseUrl}\\?file=`));
   await expect(page.getByText("3 of 5")).toBeVisible();
   await expect(page.getByText("2 failed")).toBeVisible();

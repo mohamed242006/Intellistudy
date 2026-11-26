@@ -5,6 +5,7 @@
 
 /** Page sizes: the backend default for courses (50) and its maximum for documents (100), so lists rarely page. */
 export const COURSE_PAGE_SIZE = 50;
+export const CONVERSATION_PAGE_SIZE = 50;
 export const DOCUMENT_PAGE_SIZE = 100;
 
 export const queryKeys = {
@@ -14,4 +15,8 @@ export const queryKeys = {
   documentsOf: (courseId: string) => ["documents", courseId] as const,
   documentList: (courseId: string, limit: number = DOCUMENT_PAGE_SIZE) => ["documents", courseId, { limit }] as const,
   document: (documentId: string) => ["document", documentId] as const,
+  summary: (documentId: string) => ["summary", documentId] as const,
+  conversationsOf: (courseId: string) => ["conversations", courseId] as const,
+  conversationList: (courseId: string, limit: number = CONVERSATION_PAGE_SIZE) => ["conversations", courseId, { limit }] as const,
+  conversation: (conversationId: string) => ["conversation", conversationId] as const,
 };

@@ -103,7 +103,7 @@ export function UploadPage({ courseId }: { courseId: string }) {
                 detail={view.detail}
                 actions={
                   view.status === "indexed" ? (
-                    <ButtonLink variant="ghost" href={`/courses/${encodeURIComponent(courseId)}?file=${encodeURIComponent(doc.id)}`} aria-label={PROVISIONAL.openLabel(doc.file_name)}>
+                    <ButtonLink variant="ghost" href={`/courses/${encodeURIComponent(courseId)}/documents/${encodeURIComponent(doc.id)}/summary`} aria-label={PROVISIONAL.openLabel(doc.file_name)}>
                       {FIGMA.open}
                     </ButtonLink>
                   ) : view.canRetry ? (

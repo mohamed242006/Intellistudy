@@ -94,6 +94,7 @@ export function Workspace({ courseId }: { courseId: string }) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <h1 className="min-w-0 text-h1 break-words text-fg">{data.name}</h1>
           <div className="flex flex-wrap gap-3">
+            <ButtonLink href={`/courses/${encodeURIComponent(courseId)}/chat`}>{FIGMA.askMaterials}</ButtonLink>
             <Button variant="secondary" onClick={() => setRenaming(true)}>
               {COURSE_COPY.rename}
             </Button>
@@ -208,6 +209,7 @@ export function Workspace({ courseId }: { courseId: string }) {
             retrying={retry.isPending}
             onRetry={() => runRetry(selected)}
             onDelete={() => setDeletingDoc(selected)}
+            summaryHref={`/courses/${encodeURIComponent(courseId)}/documents/${encodeURIComponent(selected.id)}/summary`}
           />
         ) : documents.isSuccess && summary.total > 0 ? (
           <p className="text-body-sm text-fg-secondary">{requested ? PROVISIONAL.notFound : PROVISIONAL.selectHint}</p>

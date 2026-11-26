@@ -3,10 +3,11 @@
 Next.js 15 (App Router), TypeScript (strict), Tailwind CSS v4, TanStack Query, React Hook Form, Zod.
 Visual source of truth: [`../docs/figma_ui_context.md`](../docs/figma_ui_context.md). Plan and gates:
 [`../docs/FRONTEND_IMPLEMENTATION_PLAN.md`](../docs/FRONTEND_IMPLEMENTATION_PLAN.md), [`../docs/F0A_GATE.md`](../docs/F0A_GATE.md),
-[`../docs/F0B_GATE.md`](../docs/F0B_GATE.md).
+[`../docs/F0B_GATE.md`](../docs/F0B_GATE.md), [`../docs/F1_GATE.md`](../docs/F1_GATE.md).
 
 **Status:** F0-A (foundations, Sign in, Sign up, session, route protection) and F0-B (Dashboard, courses, Course
-Workspace, uploads with processing status, retry, download and deletion).
+Workspace, uploads with processing status, retry, download and deletion) and F1 (grounded summaries and chat with
+cited sources).
 
 | Route | Screen |
 |---|---|
@@ -14,6 +15,8 @@ Workspace, uploads with processing status, retry, download and deletion).
 | `/` | Dashboard ("Your courses" at `/#courses`; `/courses` redirects there) |
 | `/courses/[courseId]` | Course Workspace (`?file=` selects a file) |
 | `/courses/[courseId]/upload` | Upload flow |
+| `/courses/[courseId]/documents/[documentId]/summary` | Summary (`?source=n` opens a citation) |
+| `/courses/[courseId]/chat` | Chat (`?c=` selects a conversation) |
 
 ## Run
 
@@ -36,15 +39,22 @@ without it talks to `http://127.0.0.1:8000` whatever `next start` is given. Set 
 
 ```bash
 npm run lint && npm run typecheck && npm test && npm run build
-npx playwright install chromium && npm run e2e     # starts its own backend (port 8100) and frontend (port 3100)
+npx playwright install chromium && npm run e2e     # isolated backend 8100, test provider 8101, frontend 3100
 ```
 
 The end-to-end suite starts a throwaway backend with `scripts/e2e-backend.sh`:
 - a fresh SQLite database and file storage in a temporary directory, never `data/backend/`;
 - it never reads `.env`;
 - no LLM provider;
-- the processing worker on (since F0-B), so uploads reach real terminal states with the real embedding model;
-- the real rate limits.
+- the processing worker on (since F0-B), so uploads reach real terminal states with the real embedding model (loaded
+  offline from the local cache; `E2E_HF_OFFLINE=0` allows a first download);
+- a **deterministic test provider** (`tests/e2e/fixtures/stub_llm.py`, F1) through the backend's `local` provider slot:
+  no key, no real model, no network. Retrieval, grounding, citation validation and answer states are the backend's
+  real code;
+- the real rate limits;
+- explicit ports only: `scripts/e2e-backend.sh` and `scripts/e2e-frontend.sh` refuse a missing target and port 8000,
+  and the frontend script checks the built rewrite before starting. The temporary directory and processes are removed
+  on exit.
 
 Upload fixtures (PDF, PPTX, DOCX, an empty PDF and a damaged PDF) are generated into a temporary directory by
 `tests/e2e/fixtures/make_fixtures.py`; `data/uploads/` is never used.

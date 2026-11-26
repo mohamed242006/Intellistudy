@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/design-system/components/Button";
+import { Button, ButtonLink } from "@/design-system/components/Button";
 import { Tag, type TagTone } from "@/design-system/components/Tag";
 import type { DocumentOut } from "@/lib/api/types";
 import { relativeTime } from "@/lib/format/format";
@@ -11,10 +11,11 @@ const TAG_TONE: Record<string, TagTone> = { extracting: "accent", indexed: "succ
 
 /**
  * Selected-file details (UI §8.3 right column; gate GF0B-10). Backend fields only: type, size, pages or slides, upload
- * and index times. "Open summary", "Ask about this file", "Generate quiz" and topic chips belong to F1/F2 and are
- * not rendered. Actions: Download, Retry (Failed only), Delete file.
+ * and index times. "Ask about this file" (no per-file chat scope in the UI yet), "Generate quiz" (F2) and topic chips
+ * (no backend data) are not rendered. Actions: Open summary (F1, ready files), Download, Retry (Failed only), Delete
+ * file.
  */
-export function FileDetails({ document, now, onDownload, downloading, onRetry, retrying, onDelete }: {
+export function FileDetails({ document, now, onDownload, downloading, onRetry, retrying, onDelete, summaryHref }: {
   document: DocumentOut;
   now: Date;
   onDownload: () => void;
@@ -22,6 +23,7 @@ export function FileDetails({ document, now, onDownload, downloading, onRetry, r
   onRetry: () => void;
   retrying: boolean;
   onDelete: () => void;
+  summaryHref: string;
 }) {
   const view = documentView(document, now);
   const rows: [string, string][] = [[PROVISIONAL.type, fileTypeLabel(document.file_type)], [FIGMA.size, sizeLabel(document.size_bytes)]];
@@ -48,6 +50,11 @@ export function FileDetails({ document, now, onDownload, downloading, onRetry, r
         ))}
       </dl>
       <div className="flex flex-col gap-3">
+        {document.status === "ready" ? (
+          <ButtonLink href={summaryHref} fullWidth>
+            {FIGMA.openSummary}
+          </ButtonLink>
+        ) : null}
         <Button variant="secondary" fullWidth loading={downloading} onClick={onDownload}>
           {PROVISIONAL.download}
         </Button>
