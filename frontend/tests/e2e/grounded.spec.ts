@@ -100,7 +100,7 @@ async function ask(question: string) {
 test.beforeAll(async ({ browser }: { browser: Browser }) => {
   fixtures = mkdtempSync(join(tmpdir(), "intellistudy-f1-fixtures-"));
   execFileSync(python(), [join(__dirname, "fixtures", "make_fixtures.py"), fixtures], { stdio: "inherit" });
-  context = await browser.newContext({ viewport: WIDTHS[0] });
+  context = await browser.newContext({ viewport: WIDTHS[0], reducedMotion: "reduce" });
   page = await context.newPage();
   page.on("dialog", async (dialog) => {
     dialogs.push(dialog.message());
@@ -257,7 +257,7 @@ test("GF1-12 history survives a reload in order", async () => {
 
 test("GF1-17 another user's summary and conversation URLs show only a generic not-found state", async ({ browser }) => {
   test.setTimeout(120_000);
-  const other = await browser.newContext({ viewport: WIDTHS[0] });
+  const other = await browser.newContext({ viewport: WIDTHS[0], reducedMotion: "reduce" });
   const alice = await other.newPage();
   try {
     await signIn(alice, ALICE.email);

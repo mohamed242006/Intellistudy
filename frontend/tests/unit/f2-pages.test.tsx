@@ -400,7 +400,7 @@ describe("GF2-22 GF2-23 GF2-24 F-M4-03 â€” Frontend Rendering Safety / F-M3-03 â
     const view = openAttempt();
     expect(await screen.findByRole("heading", { level: 2, name: hostile })).toBeVisible();
     const check = () => {
-      expect(document.querySelector("main script, main img, main iframe")).toBeNull();
+      expect(document.querySelector("main script, main img:not([src=\"/brand/intellistudy-logo.svg\"]), main iframe")).toBeNull();
       expect([...document.querySelectorAll("a")].map((a) => a.getAttribute("href") ?? "").filter((h) => !h.startsWith("/") && h !== "#main")).toEqual([]);
       expect(b.calls.filter((c) => c.method === "DELETE")).toEqual([]);
     };

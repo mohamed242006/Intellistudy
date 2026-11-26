@@ -47,7 +47,7 @@ function SourceList({ title, sources, selected, onSelect }: { title: string; sou
               >
                 [{source.number}]
               </span>
-              <span className="min-w-0 text-body-sm break-all text-fg-secondary">{`${source.file_name} · ${source.citation_label}`}</span>
+              <span className="min-w-0 text-body-sm wrap-anywhere text-fg-secondary">{`${source.file_name} · ${source.citation_label}`}</span>
             </button>
           </li>
         ))}

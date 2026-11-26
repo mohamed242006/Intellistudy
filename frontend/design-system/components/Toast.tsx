@@ -68,7 +68,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={item.id}
             role={item.tone === "danger" ? "alert" : "status"}
             data-tone={item.tone}
-            className={`pointer-events-auto flex w-[440px] max-w-full items-center gap-3 rounded-lg border py-1 pr-1 pl-4 shadow-md ${TONE[item.tone].box}`}
+            className={`motion-enter-fast pointer-events-auto flex w-[440px] max-w-full items-center gap-3 rounded-lg border py-1 pr-1 pl-4 shadow-md ${TONE[item.tone].box}`}
           >
             <Icon name={TONE[item.tone].icon} size={20} />
             <p className="min-w-0 flex-1 text-body-sm break-words text-fg">{item.message}</p>

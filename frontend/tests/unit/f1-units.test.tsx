@@ -291,7 +291,7 @@ describe("GF1-20 GF1-21 F-M4-03 — Frontend Rendering Safety / F-M3-03 — Prom
           <SummarySection heading={payload} caption={payload} statements={[payload]} defaultExpanded />
         </>,
       );
-      expect(container.querySelector("script, img, iframe, object, embed")).toBeNull();
+      expect(container.querySelector("script, img:not([src=\"/brand/intellistudy-logo.svg\"]), iframe, object, embed")).toBeNull();
       expect([...container.querySelectorAll("a")]).toEqual([]); // no link is ever built from model or document text
       expect(container.textContent).toContain(payload.replace("[1]", ""));
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -314,7 +314,7 @@ describe("GF1-20 GF1-21 F-M4-03 — Frontend Rendering Safety / F-M3-03 — Prom
     );
     const holders = [...container.querySelectorAll("p, span")].filter((el) => el.textContent === long);
     expect(holders.length).toBeGreaterThanOrEqual(3);
-    for (const el of holders) expect(el.className).toMatch(/break-(words|all)/);
+    for (const el of holders) expect(el.className).toMatch(/break-words|wrap-anywhere/);
   });
 });
 

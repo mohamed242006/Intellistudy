@@ -34,7 +34,7 @@ export function SummarySection({ heading, caption, statements, defaultExpanded }
           <span className="shrink-0 text-caption text-fg-secondary">{caption}</span>
         </button>
       </h2>
-      <div id={bodyId} hidden={!expanded}>
+      <div id={bodyId} hidden={!expanded} className="motion-enter-fast">
         <ul className="flex flex-col gap-3 pt-1 pr-6 pb-6 pl-16 max-md:pl-6">
           {statements.map((statement, index) => (
             <li key={index} className="flex gap-3">

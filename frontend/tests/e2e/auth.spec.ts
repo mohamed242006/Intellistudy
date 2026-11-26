@@ -44,8 +44,8 @@ test("GF0A-21 auth screens match the Figma geometry at 1440×900", async ({ page
     expect(Math.round(firstLabel!.y - (heading!.y + heading!.height)), `${path}: heading to first field`).toBe(24);
   }
   await page.goto("/signin");
-  await expect(page.getByText("Study from your own materials.")).toBeVisible();
-  await expect(page.getByText("Every claim links to a page, slide or section.")).toBeVisible();
+  await expect(page.getByText("Study smarter from your own lectures.")).toBeVisible();
+  await expect(page.getByText("Every answer cites your materials")).toBeVisible();
 });
 
 test("GF0A-22 accessibility: axe, keyboard order, visible focus, no overflow at 1440 and 720", async ({ page }) => {

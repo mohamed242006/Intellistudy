@@ -1,18 +1,15 @@
 /**
- * Auth copy. FIGMA = exact strings from docs/figma_ui_context.md §8.1.4 (curly quotes and dashes kept).
+ * Auth copy. FIGMA = exact strings from docs/DESIGN_SPEC_NEW.md §3.1 (v2.0), earlier docs/figma_ui_context.md §8.1.4.
+ * The spec's third trust point ("Quizzes focus on the topics you find hardest") describes personalisation this app does
+ * not have, so it is replaced by a true statement about the existing "Retry wrong answers" flow.
  * BACKEND = sentences written by the backend (backend/app/services/auth.py, core/passwords.py).
  * PROVISIONAL = copy Figma does not provide (form-level errors); listed for approval (docs/F0A_GATE.md section 2).
  */
 
 export const FIGMA = {
-  brandHeadline: "Study from your own materials.",
-  brandSubcopy:
-    "Upload your slides, notes and papers. IntelliStudy turns them into summaries, quizzes and answers — and shows exactly where every answer comes from.",
-  trustPoints: [
-    "Answers come only from your files.",
-    "Every claim links to a page, slide or section.",
-    "Your files are private and isolated to your account.",
-  ],
+  brandHeadline: "Study smarter from your own lectures.",
+  brandSubcopy: "Upload your course files and get summaries, answers and quizzes that cite the exact page they came from.",
+  trustPoints: ["Every answer cites your materials", "Your files stay private to your account", "Retry the quiz questions you missed"],
   tabSignIn: "Sign in",
   tabCreateAccount: "Create account",
   signInTitle: "Welcome back",
@@ -21,7 +18,7 @@ export const FIGMA = {
   emailPlaceholder: "name@university.edu",
   emailHelper: "Use the address your university gave you",
   passwordLabel: "Password",
-  passwordPlaceholderSignIn: "Your password",
+  passwordPlaceholderSignIn: "Enter your password",
   fullNameLabel: "Full name",
   signInButton: "Sign in",
   createAccountButton: "Create account",

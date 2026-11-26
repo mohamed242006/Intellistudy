@@ -16,11 +16,11 @@ export function Breadcrumb({ items }: { items: ReadonlyArray<{ label: string; hr
               </span>
             ) : null}
             {item.href ? (
-              <Link href={item.href} className="rounded-sm break-all hover:text-fg hover:underline">
+              <Link href={item.href} className="rounded-sm wrap-anywhere hover:text-fg hover:underline">
                 {item.label}
               </Link>
             ) : (
-              <span aria-current="page" className="break-all">
+              <span aria-current="page" className="wrap-anywhere">
                 {item.label}
               </span>
             )}

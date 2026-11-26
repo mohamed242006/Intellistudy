@@ -1,8 +1,7 @@
 /**
- * VISUAL BLOCKER (UI A8 / plan 11.3-9): the 30 Figma icon components (`icon/*`, 24×24 grid, 2 px stroke) have not been
- * exported to the repository yet. No glyph is drawn and no third-party icon stands in for them: each use renders an
- * empty box of the exact Figma size, marked `data-icon-placeholder`, so layout matches and the gap stays visible.
- * Replace each entry with the exported SVG; tests list every placeholder still in use.
+ * Icon names and where each is used. The glyphs are drawn in Icon.tsx (Lucide shapes, the fallback docs/DESIGN_SPEC_NEW.md
+ * §10.1 names, because the 30 Figma icon vectors were never exported). The usage lists below are the original F0
+ * inventory; tests use them to check every recorded use has a glyph.
  */
 
 export const ICON_NAMES = [

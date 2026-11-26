@@ -23,7 +23,7 @@ const requests: string[] = [];
 
 test.beforeAll(async ({ browser }: { browser: Browser }) => {
   fixtures = makeFixtures("intellistudy-f2-fixtures-");
-  context = await browser.newContext({ viewport: WIDTHS[0] });
+  context = await browser.newContext({ viewport: WIDTHS[0], reducedMotion: "reduce" });
   page = await context.newPage();
   page.on("dialog", async (dialog) => {
     dialogs.push(dialog.message());
@@ -168,7 +168,7 @@ test("GF2-16 GF2-26 GF2-24 Retry wrong answers starts a new attempt with only th
 
 test("GF2-20 another user's quiz, attempt and review URLs show the same generic not-found state", async ({ browser }) => {
   test.setTimeout(120_000);
-  const other = await browser.newContext({ viewport: WIDTHS[0] });
+  const other = await browser.newContext({ viewport: WIDTHS[0], reducedMotion: "reduce" });
   const alice = await other.newPage();
   try {
     await signIn(alice, ALICE.email);

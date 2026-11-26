@@ -41,9 +41,9 @@ export function Card({ href, title, description, status, meta, footer }: {
 export function CardSkeleton() {
   return (
     <div aria-hidden="true" data-card-loading className="flex h-[122px] flex-col gap-3 rounded-xl border border-line bg-surface p-6">
-      <span className="h-4 w-[200px] max-w-full rounded-sm bg-subtle" />
-      <span className="h-4 w-[280px] max-w-full rounded-sm bg-subtle" />
-      <span className="h-4 w-[240px] max-w-full rounded-sm bg-subtle" />
+      <span className="h-4 w-[200px] max-w-full rounded-sm bg-subtle motion-pulse" />
+      <span className="h-4 w-[280px] max-w-full rounded-sm bg-subtle motion-pulse" />
+      <span className="h-4 w-[240px] max-w-full rounded-sm bg-subtle motion-pulse" />
     </div>
   );
 }

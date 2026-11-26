@@ -167,7 +167,7 @@ export function Workspace({ courseId }: { courseId: string }) {
                 <Link href={fileHref(doc.id)} scroll={false} aria-current={isSelected ? "true" : undefined} className="flex flex-col gap-1 rounded-md px-3 py-2 hover:bg-subtle">
                   <span className="flex items-start gap-2">
                     <Icon name="file" size={20} />
-                    <span className="min-w-0 text-label break-all text-fg">{doc.file_name}</span>
+                    <span className="min-w-0 text-label wrap-anywhere text-fg">{doc.file_name}</span>
                   </span>
                   <span className="flex flex-wrap items-center gap-2 pl-7">
                     <Tag tone={TAG_TONE[view.status] ?? "neutral"}>{view.tag}</Tag>

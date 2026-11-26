@@ -17,8 +17,9 @@ export default defineConfig({
   workers: 1, // one backend, real rate limits: keep the auth calls sequential and few
   retries: 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
-  use: { baseURL: FRONTEND, trace: "retain-on-failure", viewport: { width: 1440, height: 900 } },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } }],
+  // Reduced motion: entrance animations are off (app/globals.css), so accessibility checks never see text mid-fade.
+  use: { baseURL: FRONTEND, trace: "retain-on-failure", viewport: { width: 1440, height: 900 }, contextOptions: { reducedMotion: "reduce" } },
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, contextOptions: { reducedMotion: "reduce" } } }],
   webServer: [
     {
       command: "bash scripts/e2e-backend.sh",

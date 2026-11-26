@@ -16,7 +16,15 @@ import { ApiError } from "@/lib/api/errors";
 import { UploadAbortedError, uploadFile } from "@/lib/api/upload";
 import { upsertDocument } from "@/features/documents/hooks";
 import { PROVISIONAL } from "@/features/documents/strings";
-import { initialQueue, nextPending, problemForError, queueReducer } from "./queue";
+import { initialQueue, nextPending, problemForClient, problemForError, queueReducer } from "./queue";
+import { contentProblem, type ClientProblem } from "./validation";
+
+/** A file refused by the content check before any byte was sent. */
+class ClientCheckError extends Error {
+  constructor(readonly problem: ClientProblem) {
+    super(problem);
+  }
+}
 
 export type { UploadItem } from "./queue";
 
@@ -73,18 +81,22 @@ export function useUploadQueue(courseId: string, activeCount: number) {
     controllers.current.set(item.id, controller);
     dispatch({ type: "start", id: item.id });
     let lastPercent = 0;
-    uploadFile(
-      courseId,
-      item.file,
-      ({ loaded, total }) => {
-        const percent = total > 0 ? Math.min(100, Math.floor((loaded / total) * 100)) : 0;
-        if (percent !== lastPercent) {
-          lastPercent = percent;
-          dispatch({ type: "progress", id: item.id, percent });
-        }
-      },
-      controller.signal,
-    )
+    contentProblem(item.file)
+      .then((checked) => {
+        if (checked) throw new ClientCheckError(checked);
+        return uploadFile(
+          courseId,
+          item.file,
+          ({ loaded, total }) => {
+            const percent = total > 0 ? Math.min(100, Math.floor((loaded / total) * 100)) : 0;
+            if (percent !== lastPercent) {
+              lastPercent = percent;
+              dispatch({ type: "progress", id: item.id, percent });
+            }
+          },
+          controller.signal,
+        );
+      })
       .then((response) => {
         dispatch({ type: "accepted", id: item.id });
         for (const doc of response.documents) {
@@ -95,6 +107,12 @@ export function useUploadQueue(courseId: string, activeCount: number) {
         setAnnouncement(PROVISIONAL.uploadedAnnouncement(item.file.name));
       })
       .catch((error: unknown) => {
+        if (error instanceof ClientCheckError) {
+          const problem = problemForClient(error.problem);
+          dispatch({ type: "problem", id: item.id, problem });
+          setAnnouncement(PROVISIONAL.rejectedAnnouncement(item.file.name, problem.message));
+          return;
+        }
         if (error instanceof UploadAbortedError) {
           dispatch({ type: "remove", id: item.id });
           void client.invalidateQueries({ queryKey: ["documents", courseId] }); // the server may have accepted it

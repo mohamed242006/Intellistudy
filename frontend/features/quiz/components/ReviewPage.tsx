@@ -201,7 +201,7 @@ function QuestionReview({ result, total, expanded, onToggle }: { result: ResultQ
           <Icon name={expanded ? "chevronDown" : "chevronRight"} size={20} />
         </button>
       </h2>
-      <div id={bodyId} hidden={!expanded} className="flex flex-col gap-4 px-6 pb-6">
+      <div id={bodyId} hidden={!expanded} className="motion-enter-fast flex flex-col gap-4 px-4 pb-6 sm:px-6">
         <p className="text-title break-words text-fg">{result.stem}</p>
         {rows ? (
           <div className="flex flex-col gap-3">

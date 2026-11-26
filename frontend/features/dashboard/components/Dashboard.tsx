@@ -101,7 +101,7 @@ export function Dashboard() {
           </div>
         ) : (
           <>
-            <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,300px),1fr))] gap-6">
+            <ul className="motion-stagger grid grid-cols-[repeat(auto-fill,minmax(min(100%,300px),1fr))] gap-6">
               {list.map((course) => (
                 <li key={course.id} className="flex min-w-0 flex-col [&>a]:flex-1">
                   <CourseCard course={course} />

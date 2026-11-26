@@ -8,7 +8,9 @@ import { documentActionError } from "@/features/documents/messages";
 import { EMPTY_CODES, IN_PROGRESS_STATUSES, TERMINAL_STATUSES, UNSUPPORTED_CODES, documentView, summarise } from "@/features/documents/status";
 import { BACKEND_REASONS } from "@/features/documents/strings";
 import { initialQueue, nextPending, problemForError, queueReducer } from "@/features/upload/queue";
-import { MAX_UPLOAD_BYTES, clientProblem, selectionKey } from "@/features/upload/validation";
+import { MAX_UPLOAD_BYTES, clientProblem, contentProblem, selectionKey } from "@/features/upload/validation";
+import { PROXY_BODY_LIMIT_BYTES } from "@/features/upload/limits";
+import nextConfig from "@/next.config";
 import { attachmentFileName, query } from "@/lib/api/client";
 import { ApiError, apiErrorFromBody } from "@/lib/api/errors";
 import { formatBytes, greeting, greetingDate, initials, plural, relativeTime } from "@/lib/format/format";
@@ -119,6 +121,27 @@ describe("GF0B-14 client-side upload checks", () => {
     expect(clientProblem(sized("a.pdf", MAX_UPLOAD_BYTES + 1))).toBe("file_too_large");
   });
 
+  it("UPL-PROXY the Next.js proxy forwards a whole maximum-size upload (the 10 MB default cut PPTX uploads off)", () => {
+    // Next.js 15.5 reads experimental.middlewareClientMaxBodySize for proxied (rewritten) request bodies.
+    expect(nextConfig.experimental?.middlewareClientMaxBodySize).toBe(PROXY_BODY_LIMIT_BYTES);
+    expect(PROXY_BODY_LIMIT_BYTES).toBeGreaterThan(MAX_UPLOAD_BYTES);
+    expect(PROXY_BODY_LIMIT_BYTES - MAX_UPLOAD_BYTES).toBe(1024 * 1024); // the backend's own multipart headroom
+    expect(read("api/v1/documents.py")).toContain("settings.max_upload_bytes + 1024 * 1024");
+  });
+
+  it("UPL-CONTENT the file signature and a specific browser type must match the extension", async () => {
+    const make = (name: string, bytes: number[], type = "") => new File([new Uint8Array(bytes)], name, { type });
+    const PDF = [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31];
+    const ZIP = [0x50, 0x4b, 0x03, 0x04, 0x14];
+    expect(await contentProblem(make("a.pdf", PDF, "application/pdf"))).toBeNull();
+    expect(await contentProblem(make("deck.pptx", ZIP))).toBeNull();
+    expect(await contentProblem(make("deck.pptx", ZIP, "application/vnd.openxmlformats-officedocument.presentationml.presentation"))).toBeNull();
+    expect(await contentProblem(make("notes.docx", ZIP, "application/octet-stream"))).toBeNull();
+    expect(await contentProblem(make("deck.pptx", PDF))).toBe("type_mismatch");
+    expect(await contentProblem(make("movie.pdf", [0, 0, 0, 0x18, 0x66], "video/mp4"))).toBe("type_mismatch");
+    expect(await contentProblem(make("a.pdf", PDF, "image/png"))).toBe("type_mismatch");
+  });
+
   it("GF0B-14 the same file selected twice while queued is queued once; rejected files get a row", () => {
     const a = sized("a.pdf", 10, 5);
     let ids = 0;
@@ -165,7 +188,8 @@ describe("GF0B-17 server rejections on the row", () => {
   it("GF0B-17 maps every upload failure code to its row status and sentence", () => {
     expect(problemForError(err(422, "upload_rejected", { files: [{ file: "a.pdf", reason: "type_mismatch", message: "x" }] }))).toEqual({ status: "unsupported", message: "The file's content does not match its extension.", retryable: false });
     expect(problemForError(err(422, "upload_rejected", { files: [{ file: "a.pdf", reason: "empty_file" }] }))).toMatchObject({ status: "empty", retryable: false });
-    expect(problemForError(err(413, "file_too_large"))).toEqual({ status: "failed", message: "This file is larger than 100 MB.", retryable: false });
+    expect(problemForError(err(413, "file_too_large"))).toEqual({ status: "failed", message: "This file is larger than 100 MB. Split or compress it, then upload it again.", retryable: false });
+    expect(problemForError(err(400, "malformed_upload"))).toEqual({ status: "failed", message: "The file didn’t arrive complete. Check your connection and try again.", retryable: true });
     expect(problemForError(err(413, "quota_exceeded")).message).toBe("Your storage quota is full. Delete documents to upload more.");
     expect(problemForError(err(429, "queue_full"))).toMatchObject({ message: "Too many documents are still processing. Try again later.", retryable: true });
     expect(problemForError(err(429, "rate_limited", {}, "120")).message).toBe("Too many uploads in the last hour. Try again in 2 minutes.");

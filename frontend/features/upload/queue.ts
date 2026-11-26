@@ -36,6 +36,7 @@ export const initialQueue: QueueState = { items: [] };
 
 export function problemForClient(problem: ClientProblem): RowProblem {
   if (problem === "unsupported_type") return { status: "unsupported", message: FIGMA.notSupportedDetail, retryable: false };
+  if (problem === "type_mismatch") return { status: "unsupported", message: PROVISIONAL.typeMismatch, retryable: false };
   if (problem === "empty_file") return { status: "empty", message: reasonText("empty_file"), retryable: false };
   return { status: "failed", message: PROVISIONAL.tooLarge, retryable: false };
 }
@@ -53,6 +54,7 @@ export function problemForError(error: unknown): RowProblem {
     return { status: "unsupported", message: reasonText(reason), retryable: false };
   }
   if (error.code === "file_too_large") return { status: "failed", message: PROVISIONAL.tooLarge, retryable: false };
+  if (error.code === "malformed_upload") return { status: "failed", message: PROVISIONAL.uploadIncomplete, retryable: true };
   if (error.code === "quota_exceeded") return { status: "failed", message: PROVISIONAL.quotaExceeded, retryable: false };
   if (error.code === "queue_full") return { status: "failed", message: PROVISIONAL.queueFull, retryable: true };
   if (error.code === "rate_limited") return { status: "failed", message: PROVISIONAL.rateLimited(waitText(error.retryAfterSeconds)), retryable: true };

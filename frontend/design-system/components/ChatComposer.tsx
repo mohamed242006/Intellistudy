@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type KeyboardEvent } from "react";
+import { useId, type KeyboardEvent, type Ref } from "react";
 import { Icon } from "../icons/Icon";
 import { Button } from "./Button";
 
@@ -10,7 +10,7 @@ import { Button } from "./Button";
  * placeholder becomes "Searching your materials…" and the button "Answering…" (`aria-busy`), the text stays readable
  * but read-only. Enter sends, Shift+Enter adds a line (UI §18 D-7); nothing is sent while composing an IME word.
  */
-export function ChatComposer({ label, value, onChange, onSubmit, pending, blocked, placeholder, loadingPlaceholder, sendLabel, pendingLabel, scope, error, maxLength }: {
+export function ChatComposer({ label, value, onChange, onSubmit, pending, blocked, placeholder, loadingPlaceholder, sendLabel, pendingLabel, scope, error, maxLength, inputRef, errorAction }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -25,6 +25,10 @@ export function ChatComposer({ label, value, onChange, onSubmit, pending, blocke
   scope: string | null;
   error: string | null;
   maxLength: number;
+  /** The textarea, so a suggestion can put a question in and focus it. */
+  inputRef?: Ref<HTMLTextAreaElement>;
+  /** Shown next to the error, for example "Send again" after a network failure. */
+  errorAction?: React.ReactNode;
 }) {
   const id = useId();
   const errorId = `${id}-error`;
@@ -51,6 +55,7 @@ export function ChatComposer({ label, value, onChange, onSubmit, pending, blocke
           {label}
         </label>
         <textarea
+          ref={inputRef}
           id={id}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -78,9 +83,12 @@ export function ChatComposer({ label, value, onChange, onSubmit, pending, blocke
           </Button>
         </div>
       </div>
-      <p id={errorId} role="alert" className="text-body-sm text-danger-fg empty:sr-only">
-        {error ?? ""}
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p id={errorId} role="alert" className="text-body-sm text-danger-fg empty:sr-only">
+          {error ?? ""}
+        </p>
+        {error && errorAction ? errorAction : null}
+      </div>
     </form>
   );
 }

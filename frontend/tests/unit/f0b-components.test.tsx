@@ -15,6 +15,7 @@ import { TOAST_TIMEOUT_MS, ToastProvider, useToast } from "@/design-system/compo
 import { Breadcrumb } from "@/design-system/compositions/Breadcrumb";
 import { StatCard } from "@/design-system/compositions/StatCard";
 import { UserCard } from "@/design-system/compositions/UserCard";
+import { Icon } from "@/design-system/icons/Icon";
 import { F0B_ICON_USES } from "@/design-system/icons/placeholders";
 import { HOSTILE } from "../helpers/data";
 
@@ -105,12 +106,17 @@ describe("GF0B-02 F0-B components", () => {
     expect(screen.getByRole("button", { name: "Account: Layla Hassan layla@example.org" })).toHaveTextContent("LHAccount: Layla Hassanlayla@example.org");
   });
 
-  it("GF0B-02 every F0-B icon use is a recorded placeholder (visual blocker, no invented glyph)", () => {
+  it("GF0B-02 every recorded icon use draws a decorative glyph of the spec's library (§10.1, Lucide fallback)", () => {
     expect(F0B_ICON_USES.length).toBeGreaterThan(0);
     render(<IconButton icon="x" label="Close" />);
-    const slot = screen.getByRole("button").querySelector("[data-icon-placeholder]")!;
-    expect(slot).toHaveAttribute("aria-hidden", "true");
-    expect(slot.children).toHaveLength(0);
+    const svg = screen.getByRole("button", { name: "Close" }).querySelector("svg[data-icon=x]")!;
+    expect(svg).toHaveAttribute("aria-hidden", "true");
+    expect(svg).toHaveAttribute("stroke", "currentColor");
+    expect(svg.children.length).toBeGreaterThan(0);
+    for (const use of F0B_ICON_USES) {
+      const { container } = render(<Icon name={use.icon} size={20} />);
+      expect(container.querySelector(`svg[data-icon=${use.icon}] *`), use.where).not.toBeNull();
+    }
   });
 });
 

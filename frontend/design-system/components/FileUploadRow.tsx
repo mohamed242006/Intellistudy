@@ -41,7 +41,7 @@ export function FileUploadRow({ name, status, tag, detail, progress, actions }: 
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <span className="min-w-0 text-label break-all text-fg">{name}</span>
+          <span className="min-w-0 text-label wrap-anywhere text-fg">{name}</span>
           <Tag tone={look.tag}>{tag}</Tag>
         </div>
         <p className={`text-body-sm break-words ${look.text}`}>{detail}</p>

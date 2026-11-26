@@ -262,7 +262,7 @@ describe("GF1-20 GF1-21 F-M4-03 — Frontend Rendering Safety / F-M3-03 — Prom
     await within(log).findAllByText(/Ignore all previous instructions/);
     await userEvent.click(screen.getAllByRole("button", { name: /^Source 1:/ })[0]!);
     const main = screen.getByRole("main");
-    expect(main.querySelector("script, img, iframe")).toBeNull();
+    expect(main.querySelector("script, img:not([src=\"/brand/intellistudy-logo.svg\"]), iframe")).toBeNull();
     expect([...document.querySelectorAll("a")].map((a) => a.getAttribute("href") ?? "").filter((h) => !h.startsWith("/") && h !== "#main")).toEqual([]);
     expect(b.calls.filter((c) => c.method === "DELETE" || (c.method === "POST" && !c.path.startsWith("/auth/")))).toEqual([]);
     expect(nav.push.mock.calls.concat(nav.replace.mock.calls).every(([href]) => String(href).startsWith(`/courses/${COURSE_ID}/chat`))).toBe(true);

@@ -358,7 +358,7 @@ describe("GF0B-15 GF0B-16 GF0B-17 upload flow", () => {
     const { container } = upload();
     expect(await screen.findByRole("heading", { level: 1, name: "Add materials" })).toBeVisible();
     const input = container.querySelector<HTMLInputElement>("input[type=file]")!;
-    await user().upload(input, [pdf("a.pdf"), pdf("b.pdf"), new File(["x"], "c.pptx")]);
+    await user().upload(input, [pdf("a.pdf"), pdf("b.pdf"), new File(["PK\u0003\u0004x"], "c.pptx")]);
     await waitFor(() => expect(FakeXHR.all).toHaveLength(1));
     expect(xhrFor("a.pdf")).toBeDefined();
     expect(screen.getAllByText("Waiting")).toHaveLength(2);
@@ -412,7 +412,11 @@ describe("GF0B-15 GF0B-16 GF0B-17 upload flow", () => {
     expect(FakeXHR.all).toHaveLength(0);
     busy = [{ ...busy[0]!, status: "ready" }, ...busy.slice(1)];
     await tick();
-    await waitFor(() => expect(FakeXHR.all).toHaveLength(1));
+    // the content check (file signature) reads the file asynchronously before the transfer starts
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(FakeXHR.all).toHaveLength(1);
   });
 
   it("GF0B-16 queue_full requeues the row while this course has work in progress, otherwise offers Retry", async () => {
@@ -527,7 +531,7 @@ describe("GF0B-25 F-M4-03 — Frontend Rendering Safety in the workspace and upl
     expect(await screen.findByRole("heading", { level: 1, name: HOSTILE[0] })).toBeVisible();
     for (const name of HOSTILE) expect((await screen.findAllByText(name)).length).toBeGreaterThan(0);
     const check = () => {
-      expect(document.querySelector("main script, main img, main iframe")).toBeNull();
+      expect(document.querySelector("main script, main img:not([src=\"/brand/intellistudy-logo.svg\"]), main iframe")).toBeNull();
       expect([...document.querySelectorAll("a")].map((a) => a.getAttribute("href") ?? "").filter((h) => !h.startsWith("/") && h !== "#main")).toEqual([]);
     };
     check();

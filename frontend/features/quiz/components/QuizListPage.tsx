@@ -227,7 +227,7 @@ function GenerateForm({ courseId, ready, preselected }: { courseId: string; read
                     onChange={(e) => setForm({ ...form, documents: e.target.checked ? [...form.documents, doc.id] : form.documents.filter((id) => id !== doc.id) })}
                     className="size-5 shrink-0 accent-[var(--color-accent)]"
                   />
-                  <span className="min-w-0 break-all">{doc.file_name}</span>
+                  <span className="min-w-0 wrap-anywhere">{doc.file_name}</span>
                 </label>
               </li>
             ))}

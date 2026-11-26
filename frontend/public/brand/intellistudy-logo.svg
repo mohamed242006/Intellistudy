@@ -1,0 +1,9 @@
+<!-- PLACEHOLDER, not the final IntelliStudy logo. It draws the "Mark" the design spec infers for every shell
+     (docs/DESIGN_SPEC_NEW.md section 10.2: accent/default square, radius 8, a book icon in text/on-accent).
+     Replace this file with the real logo (same path, square artwork) and every usage picks it up. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="IntelliStudy">
+  <rect width="32" height="32" rx="8" fill="#2F5D46"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(7 7) scale(0.75)">
+    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+  </g>
+</svg>

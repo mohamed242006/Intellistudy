@@ -109,7 +109,7 @@ export function SummaryPage({ courseId, documentId }: { courseId: string; docume
             <h1 className="text-h1 break-words text-fg">{FIGMA.summaryTitle(doc.file_name)}</h1>
             <div className="flex flex-wrap items-center gap-2">
               {doc.status === "ready" ? <Tag tone="success">{FIGMA.indexed}</Tag> : null}
-              <span className="text-body-sm break-all text-fg-secondary">{meta}</span>
+              <span className="text-body-sm wrap-anywhere text-fg-secondary">{meta}</span>
             </div>
           </div>
           {data?.status === "ready" ? (

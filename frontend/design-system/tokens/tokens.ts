@@ -1,11 +1,13 @@
 /**
- * Design tokens, exactly as recorded from the Figma variables in docs/figma_ui_context.md (UI §4).
+ * Design tokens, exactly as recorded from the Figma variables in docs/DESIGN_SPEC_NEW.md (v2.0, §7 type, §8 colour,
+ * §9 spacing/radius/shadow/motion). It supersedes docs/figma_ui_context.md §4; the only colour change is the accent
+ * ramp (teal → green #2F5D46); every semantic mapping is unchanged.
  * This file is the single source; `npm run tokens` writes tokens.css from it, and tests check both against the
- * tables in the context document (gate GF0A-01). Components never use primitives directly (UI §3.2).
+ * spec's tables (gate GF0A-01). Components never use primitives directly (spec §16.1).
  */
 
 export const primitives = {
-  accent: { 50: "#ECF7FA", 100: "#D3EEF4", 200: "#A9DCE8", 300: "#78C4D7", 400: "#3FA5BF", 500: "#1B8AA6", 600: "#0F6F8A", 700: "#0B5970", 800: "#0A4457", 900: "#082F3D" },
+  accent: { 50: "#ECF3ED", 100: "#D8E7DB", 200: "#B9D2C0", 300: "#AED2B6", 400: "#87B697", 500: "#427956", 600: "#2F5D46", 700: "#244936", 800: "#1C382A", 900: "#203127" },
   neutral: { 0: "#FFFFFF", 50: "#F6F8F9", 100: "#EDF0F2", 200: "#DDE2E6", 300: "#C3CBD1", 400: "#9AA5AD", 500: "#6B7782", 600: "#4F5A64", 700: "#38424B", 800: "#232B33", 850: "#1A2027", 900: "#131920", 950: "#0D1116" },
   green: { 50: "#E8F5EE", 300: "#86CFA6", 400: "#4DB37E", 500: "#2E9560", 600: "#1E7A4C", 700: "#17603B", 900: "#0F3D26" },
   amber: { 50: "#FDF4E3", 300: "#F0C675", 400: "#E0A33A", 500: "#B7791A", 600: "#A15C07", 700: "#7C4705", 900: "#4A2B04" },
@@ -100,6 +102,15 @@ export const shadows = {
   sm: "0 1px 2px rgb(13 18 23 / 6%)",
   md: "0 4px 12px rgb(13 18 23 / 8%), 0 1px 2px rgb(13 18 23 / 5%)",
   lg: "0 16px 40px rgb(13 18 23 / 16%), 0 4px 8px rgb(13 18 23 / 6%)",
+} as const;
+
+/** Motion tokens (spec §9.8): short, no bounce. Reduced motion swaps movement for a fade (app/globals.css). */
+export const motion = {
+  fast: 120,
+  base: 200,
+  slow: 300,
+  easeStandard: "cubic-bezier(0.2, 0, 0, 1)",
+  easeExit: "cubic-bezier(0.4, 0, 1, 1)",
 } as const;
 
 /** Fixed sizes (UI §4.4) used as Tailwind spacing names, in px. */

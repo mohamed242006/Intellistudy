@@ -29,18 +29,19 @@ const NO_DOCS = () => json(200, page([], 100));
 const dashboard = () => renderPage(<DashboardPage />);
 
 describe("GF0B-01 app shell", () => {
-  it("GF0B-01 Sidebar lists only Dashboard and Courses, marks the current page, and has nav and main landmarks", async () => {
+  it("GF0B-01 Sidebar lists only built destinations (Dashboard, Courses, Settings), marks the current page, and has nav and main landmarks", async () => {
     signedInBackend().on("GET /courses", () => json(200, page([])));
     dashboard();
     expect(await screen.findByRole("heading", { level: 2, name: "Your courses" })).toBeVisible();
     const navs = screen.getAllByRole("navigation", { name: "Main" });
     for (const navigation of navs) {
-      expect(within(navigation).getAllByRole("link").map((a) => a.textContent || a.getAttribute("aria-label"))).toEqual(["Dashboard", "Courses"]);
+      expect(within(navigation).getAllByRole("link").map((a) => a.textContent || a.getAttribute("aria-label"))).toEqual(["Dashboard", "Courses", "Settings"]);
       expect(within(navigation).getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
       expect(within(navigation).getByRole("link", { name: "Courses" })).toHaveAttribute("href", "/#courses");
+      expect(within(navigation).getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     }
     expect(screen.getByRole("main")).toBeVisible();
-    expect(screen.queryByRole("link", { name: /Analytics|Settings|Personalised exam|Data & privacy/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Analytics|Personalised exam|Data & privacy/ })).toBeNull();
   });
 });
 

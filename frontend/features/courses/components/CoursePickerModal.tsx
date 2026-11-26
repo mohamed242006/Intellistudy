@@ -53,7 +53,7 @@ function CoursePickerDialog({ open, courses, onClose, onChoose }: PickerProps) {
               onChange={() => setChosen(course.id)}
               className="size-4 accent-[var(--color-accent)]"
             />
-            <span className="min-w-0 text-body break-all text-fg">{course.name}</span>
+            <span className="min-w-0 text-body wrap-anywhere text-fg">{course.name}</span>
           </label>
         ))}
       </fieldset>

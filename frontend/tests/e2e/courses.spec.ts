@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type Browser, type BrowserContext, type Page, type Request } from "@playwright/test";
 import { ALICE, BOB, PASSWORD } from "./accounts";
 
 /**
@@ -66,7 +66,7 @@ function row(target: Page, name: string) {
 test.beforeAll(async ({ browser }: { browser: Browser }) => {
   fixtures = mkdtempSync(join(tmpdir(), "intellistudy-f0b-fixtures-"));
   execFileSync(python(), [join(__dirname, "fixtures", "make_fixtures.py"), fixtures], { stdio: "inherit" });
-  context = await browser.newContext({ viewport: WIDTHS[0] });
+  context = await browser.newContext({ viewport: WIDTHS[0], reducedMotion: "reduce" });
   page = await context.newPage();
   page.on("dialog", async (dialog) => {
     dialogs.push(dialog.message());
@@ -102,7 +102,7 @@ test("GF0B-04 GF0B-05 GF0B-01 GF0B-28 a new user lands on the empty Dashboard bu
   await expect(page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening), Alice$/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "No courses yet" })).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Main" }).filter({ visible: true });
-  await expect(nav.getByRole("link")).toHaveText(["Dashboard", "Courses"]);
+  await expect(nav.getByRole("link")).toHaveText(["Dashboard", "Courses", "Settings"]);
   await expect(nav.getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText(/mastery|streak|recommended|weakest|recent activity/i)).toHaveCount(0);
   expect(await seriousViolations(page), "Dashboard (empty)").toEqual([]);
@@ -265,7 +265,7 @@ test("GF0B-09 /courses goes to the Dashboard's course list", async () => {
 test("GF0B-11 another user's course URLs show the same not-found state as a missing course, with nothing leaked", async ({ browser }) => {
   const register = await page.request.post("/api/v1/auth/register", { data: { email: BOB.email, name: BOB.name, password: PASSWORD } });
   expect(register.status()).toBe(201);
-  const bobContext = await browser.newContext({ viewport: WIDTHS[0] });
+  const bobContext = await browser.newContext({ viewport: WIDTHS[0], reducedMotion: "reduce" });
   const bob = await bobContext.newPage();
   try {
     await bob.goto("/signin");
@@ -285,6 +285,29 @@ test("GF0B-11 another user's course URLs show the same not-found state as a miss
     expect(await seriousViolations(bob), "Not found").toEqual([]);
   } finally {
     await bobContext.close();
+  }
+});
+
+test("UPL-PROXY a PowerPoint over 10 MB reaches the backend whole through the Next.js proxy; a renamed file never leaves the browser", async () => {
+  test.setTimeout(300_000);
+  const large = join(fixtures, "large-lecture.pptx");
+  expect(statSync(large).size).toBeGreaterThan(10 * 1024 * 1024); // above Next.js's default 10 MB proxy body limit
+  await page.goto("/");
+  await page.getByRole("link", { name: new RegExp(COURSE.replace(/[()]/g, "\\$&")) }).click();
+  await page.getByRole("link", { name: "Add files" }).click();
+  const sent: string[] = [];
+  const onRequest = (request: Request) => {
+    if (request.method() === "POST" && /\/documents$/.test(new URL(request.url()).pathname)) sent.push(request.url());
+  };
+  page.on("request", onRequest);
+  try {
+    await page.getByTestId("file-input").setInputFiles([large, join(fixtures, "renamed-video.pptx")]);
+    await expect(row(page, "renamed-video.pptx")).toContainText("doesn’t match its extension");
+    await expect(row(page, "large-lecture.pptx").getByText("Indexed", { exact: true })).toBeVisible({ timeout: 240_000 });
+    expect(sent).toHaveLength(1); // only the real PowerPoint was uploaded
+    expect(await overflowAt(page), "Upload overflow with a large file").toEqual([]);
+  } finally {
+    page.off("request", onRequest);
   }
 });
 

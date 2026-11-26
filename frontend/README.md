@@ -66,6 +66,24 @@ Upload fixtures (PDF, PPTX, DOCX, an empty PDF and a damaged PDF) are generated 
 
 It uses the repository's `.venv` Python when present; set `E2E_PYTHON` to choose another interpreter.
 
+## Uploads, brand assets and motion
+
+- **Upload size.** One file per request, up to the backend's `max_upload_bytes` (100 MB). The `/api/v1` rewrite is a
+  Next.js proxy, and Next.js 15 cuts proxied request bodies at `experimental.middlewareClientMaxBodySize` (default
+  10 MB), so `next.config.ts` raises it to the per-file limit plus 1 MiB of multipart framing. Both numbers live in
+  `features/upload/limits.ts`. Before sending, the browser checks the extension, the size and the file signature
+  (`%PDF-` or a ZIP container for DOCX/PPTX); the backend repeats every check and stays authoritative.
+- **Brand assets.** `public/brand/intellistudy-logo.svg` and `public/images/intellistudy-background.webp` are
+  **placeholders** (no final logo or background exists yet). Replace the files at the same paths. The paths are set in
+  `design-system/brand.ts`; see `public/brand/README.md`.
+- **Design source.** `docs/DESIGN_SPEC_NEW.md` (v2.0) is the design source. Tokens are generated from
+  `design-system/tokens/tokens.ts` (`npm run tokens`) and tested against the spec's tables.
+- **Motion.** Utilities in `app/globals.css` (`motion-enter`, `motion-enter-fast`, `motion-stagger`, `motion-pulse`,
+  `motion-dots`, `motion-progress`) use the spec's motion tokens (120/200/300 ms). They animate only opacity and
+  transform, so they cause no layout shift. Under `prefers-reduced-motion: reduce`, entrances and pulses are off and
+  only the status spinner keeps turning. Playwright runs with reduced motion so the accessibility checks see final
+  frames.
+
 ## Generated files
 
 | File | Source | Regenerate |

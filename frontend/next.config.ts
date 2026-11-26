@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { PROXY_BODY_LIMIT_BYTES } from "./features/upload/limits";
 
 /**
  * The browser talks to one origin: /api/v1/* is rewritten to the FastAPI backend, so the refresh cookie
@@ -35,6 +36,14 @@ const nextConfig: NextConfig = {
   // page. With streamed metadata, client navigations inside a dynamic route (for example ?file= in the workspace)
   // removed the <title> for a moment, a WCAG 2.4.2 gap that axe caught on the slower CI runner (frontend run #5).
   htmlLimitedBots: /.*/,
+  experimental: {
+    // The /api/v1 rewrite below proxies request bodies through a copy that Next.js 15.5 cuts off at this size (default
+    // 10 MB, node_modules/next/dist/server/body-streams.js). Uploads above 10 MB reached the backend truncated and were
+    // refused ("Request body exceeded 10MB ... Only the first 10MB will be available"). One file per request, so the
+    // limit is the backend's per-file limit plus multipart framing (features/upload/limits.ts). In Next.js 16 this
+    // option is renamed `proxyClientMaxBodySize`; 15.5 only reads `middlewareClientMaxBodySize`.
+    middlewareClientMaxBodySize: PROXY_BODY_LIMIT_BYTES,
+  },
   async rewrites() {
     return [{ source: "/api/v1/:path*", destination: `${apiOrigin()}/api/v1/:path*` }];
   },

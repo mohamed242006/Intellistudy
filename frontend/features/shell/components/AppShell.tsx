@@ -12,18 +12,20 @@ import { UserMenu } from "./UserMenu";
 /**
  * Application shells (gate GF0B-01; UI §6.1-6.3).
  * - Sidebar (264, Dashboard and Upload) and Rail (72, Workspace) at 1024 px and wider, as drawn.
- * - Only destinations that exist are listed: Dashboard and Courses (`/#courses`, no Courses frame exists). Analytics,
- *   Personalised exam, Settings and Data & privacy are hidden until their milestones.
- * - Below 1024 px (no approved design): a provisional top bar with the same two links and the account menu.
+ * - Only destinations that exist are listed: Dashboard, Courses (`/#courses`, no Courses frame exists) and Settings
+ *   (account: password, devices). Analytics, Personalised exam and Data & privacy have no backend and stay hidden.
+ * - Below 1024 px (no approved design): a provisional top bar with the same links and the account menu.
  */
-type Destination = { key: "dashboard" | "courses"; href: string; label: string; icon: IconName };
+type Destination = { key: "dashboard" | "courses" | "settings"; href: string; label: string; icon: IconName };
 
 const DESTINATIONS: readonly Destination[] = [
   { key: "dashboard", href: "/", label: FIGMA.dashboard, icon: "home" },
   { key: "courses", href: "/#courses", label: FIGMA.courses, icon: "book" },
+  { key: "settings", href: "/settings", label: FIGMA.settings, icon: "sliders" },
 ];
 
 function activeKey(pathname: string | null): Destination["key"] {
+  if (pathname && /^\/settings(\/|$)/.test(pathname)) return "settings";
   return pathname && /^\/(courses|quizzes|attempts)(\/|$)/.test(pathname) ? "courses" : "dashboard";
 }
 
@@ -64,7 +66,8 @@ function TopBar({ current }: { current: Destination["key"] }) {
 }
 
 export function SidebarShell({ children }: { children: ReactNode }) {
-  const current = activeKey(usePathname());
+  const pathname = usePathname();
+  const current = activeKey(pathname);
   return (
     <div className="min-h-screen bg-canvas lg:flex">
       <SkipLink />
@@ -86,14 +89,18 @@ export function SidebarShell({ children }: { children: ReactNode }) {
       </aside>
       <TopBar current={current} />
       <main id="main" tabIndex={-1} className="min-w-0 flex-1 outline-none">
-        {children}
+        {/* page entrance (motion/slow fade + 4px rise; off under reduced motion), replayed on each route */}
+        <div key={pathname} className="motion-enter">
+          {children}
+        </div>
       </main>
     </div>
   );
 }
 
 export function RailShell({ children }: { children: ReactNode }) {
-  const current = activeKey(usePathname());
+  const pathname = usePathname();
+  const current = activeKey(pathname);
   return (
     <div className="min-h-screen bg-canvas lg:flex">
       <SkipLink />
@@ -117,7 +124,10 @@ export function RailShell({ children }: { children: ReactNode }) {
       </aside>
       <TopBar current={current} />
       <main id="main" tabIndex={-1} className="min-w-0 flex-1 outline-none">
-        {children}
+        {/* page entrance (motion/slow fade + 4px rise; off under reduced motion), replayed on each route */}
+        <div key={pathname} className="motion-enter">
+          {children}
+        </div>
       </main>
     </div>
   );

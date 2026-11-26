@@ -25,7 +25,7 @@ export function ProgressBar({ value, label, status = "active", className = "" }:
       aria-valuetext={`${clamped}%`}
       className={`h-2 w-80 max-w-full overflow-hidden rounded-full bg-subtle ${className}`}
     >
-      <div data-status={status} className={`h-full rounded-full ${FILL[status]}`} style={{ width: `${clamped}%` }} />
+      <div data-status={status} className={`motion-progress h-full rounded-full ${FILL[status]}`} style={{ width: `${clamped}%` }} />
     </div>
   );
 }

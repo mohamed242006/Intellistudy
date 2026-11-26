@@ -1,3 +1,5 @@
+import { MAX_UPLOAD_LABEL } from "@/features/upload/limits";
+
 /**
  * Document and upload copy. FIGMA = exact strings (UI §7.16, §8.3, §8.4, §10). BACKEND_REASONS = the fixed sentences
  * of backend/app/services/documents.py `REASONS`, mirrored here and compared with that file by a test (GF0B-18).
@@ -34,7 +36,7 @@ export const FIGMA = {
   addMaterials: "Add materials",
   addMaterialsSubtitle: "PDF, Word (.docx) and PowerPoint (.pptx). Summaries, chat and quizzes are built only from these files.",
   dropTitle: "Drag files here, or choose from your computer",
-  dropHelper: "Up to 100 MB per file · text, tables and images with text are read",
+  dropHelper: `PDF, PPTX or DOCX · up to ${MAX_UPLOAD_LABEL} each · text, tables and images with text are read`,
   chooseFiles: "Choose files",
   privacy: "Files are processed in your private account space and are never shared with other students.",
   inProgress: (n: number) => `${n} in progress`,
@@ -83,7 +85,9 @@ export const PROVISIONAL = {
   pollingStoppedBody: "We couldn’t check processing progress. Try again when your connection is back.",
   documentsError: "Couldn’t load the files of this course.",
   tryAgain: "Try again",
-  tooLarge: "This file is larger than 100 MB.",
+  tooLarge: `This file is larger than ${MAX_UPLOAD_LABEL}. Split or compress it, then upload it again.`,
+  typeMismatch: "This file’s content doesn’t match its extension. Upload a real PDF, Word (.docx) or PowerPoint (.pptx) file.",
+  uploadIncomplete: "The file didn’t arrive complete. Check your connection and try again.",
   quotaExceeded: "Your storage quota is full. Delete documents to upload more.",
   queueFull: "Too many documents are still processing. Try again later.",
   rateLimited: (wait: string) => `Too many uploads in the last hour. Try again ${wait}.`,

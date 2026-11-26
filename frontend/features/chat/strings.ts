@@ -62,6 +62,19 @@ export const PROVISIONAL = {
   conversationError: "Couldn’t load this conversation.",
   tryAgain: "Try again",
   noReadyFiles: "No file of this course is ready yet. Answers use processed files only.",
+  clarifyTitle: "Which document and page do you want me to explain?",
+  clarifyBody: "Your question points to a place in a file. Pick the file, add the page or slide number, then send.",
+  clarifyFiles: "YOUR READY FILES",
+  tryAsking: "TRY ASKING",
+  closestHint: "These passages came closest. They are not an answer to your question.",
+  openFile: "Open file",
+  showMorePassage: "Show more",
+  showLessPassage: "Show less",
+  copyAnswer: "Copy answer",
+  copied: "Answer copied.",
+  copyFailed: "Couldn’t copy. Select the text to copy it instead.",
+  starters: "START WITH ONE OF YOUR FILES",
+  sendAgain: "Send again",
 } as const;
 
 /** Fixed copy for a failed send or action; never the problem body (GF1-16). */

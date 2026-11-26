@@ -35,7 +35,7 @@ export function FileDetails({ document, now, onDownload, downloading, onRetry, r
     <section aria-labelledby="selected-file-name" className="flex flex-col gap-4">
       {/* text/secondary, not tertiary: tertiary is below 4.5:1 on the canvas background (same decision as F0-A) */}
       <p className="text-caption-strong text-fg-secondary">{FIGMA.selectedFile}</p>
-      <h2 id="selected-file-name" className="text-h3 break-all text-fg">
+      <h2 id="selected-file-name" className="text-h3 wrap-anywhere text-fg">
         {document.file_name}
       </h2>
       <div>
