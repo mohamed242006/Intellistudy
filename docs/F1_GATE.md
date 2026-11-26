@@ -219,7 +219,7 @@ F1 is complete only after local checks pass, the user pushes the commit, and the
 | ruff (backend, AI, tests, E2E fixtures) | clean |
 | Backend regression (no backend file changed) | 402 tests OK |
 | Real provider (DeepSeek) | **not run**. No automated test calls a real model |
-| CI | pending the push |
+| CI | run frontend #3 (`a37bb56`) **failed** in E2E: see below; fixed in the follow-up commit, CI pending its push |
 
 Found and fixed while testing:
 
@@ -230,6 +230,25 @@ Found and fixed while testing:
 | The E2E backend loaded the embedding model with a Hugging Face network check | one run stalled past its timeout | E2E loads the model offline from the cache (`HF_HUB_OFFLINE=1`); CI fetches it in an earlier step |
 | A stuck shutdown could outlive Playwright's grace period | one temp directory was left once | cleanup escalates to SIGKILL after about 3 s, then deletes the directory |
 | Logins of all three spec files share the real 5-per-minute limit | F1's sign-in was refused once | the F1 sign-in waits for the time the form states and retries once; limits are unchanged |
+
+**CI failure of `a37bb56` (frontend #3) and its fix:**
+- **Cause:** chat retrieval loads a second model, the cross-encoder re-ranker
+  `cross-encoder/ms-marco-MiniLM-L-6-v2`. CI fetched and cached only the embedding model, and the E2E backend loads
+  models offline. The re-ranker was therefore missing, and retrieval fell back to a degraded search without it (a
+  warning, not an error). The answer states differed and the F1 chat test failed. Locally both models were already
+  cached, so the local runs could not show it.
+- **Reproduced locally:** with a cache holding only the embedding model, the same chat test fails with the same
+  re-ranker warning.
+- **Fixed:**
+  - CI fetches and caches both models (new cache key);
+  - `scripts/e2e-backend.sh` now checks before starting that both models load offline, and stops with a clear
+    message otherwise, so a run never silently tests a degraded search;
+  - the traceability test checks the workflow fetches both.
+- **Verified locally:**
+  - the preflight stops in 2 s without the re-ranker;
+  - with a CI-like cache holding both models, 26/26 pass;
+  - with the normal cache, 26/26 pass twice;
+  - Vitest 182/182.
 
 **Not verified here:** a real screen-reader audit, the real-model answer quality (manual demo only), final mobile
 fidelity, and the CI run.

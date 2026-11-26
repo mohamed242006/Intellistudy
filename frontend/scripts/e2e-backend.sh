@@ -60,6 +60,17 @@ export INTELLISTUDY_WORKER_ENABLED="${E2E_WORKER_ENABLED:-true}"
 export INTELLISTUDY_CORS_ORIGINS="${E2E_FRONTEND_ORIGIN:-http://localhost:3100}"
 
 cd "$WORK"
+# Preflight: retrieval must be the real one (embedder + re-ranker), loaded offline. Without a model the backend would
+# fall back to a degraded search and the answer states would differ, so stop here with a clear message instead.
+if ! "$PY" -c "
+from ai.chunking.config import EMBEDDING_MODEL
+from ai.retrieval.rerank import DEFAULT_RERANKER_MODEL
+from sentence_transformers import CrossEncoder, SentenceTransformer
+SentenceTransformer(EMBEDDING_MODEL); CrossEncoder(DEFAULT_RERANKER_MODEL)
+" >/dev/null 2>&1; then
+  echo "e2e-backend: the retrieval models are not in the local Hugging Face cache (run once with E2E_HF_OFFLINE=0)" >&2
+  exit 4
+fi
 "$PY" -I "$REPO/frontend/tests/e2e/fixtures/stub_llm.py" "$LLM_PORT" &
 STUB_PID=$!
 "$PY" -m backend.app.db.migrate >/dev/null

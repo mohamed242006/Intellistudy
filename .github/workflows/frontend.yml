@@ -6,7 +6,7 @@
 # (frontend/tests/e2e/fixtures/stub_llm.py on 127.0.0.1) through the backend's `local` provider slot: no key, no real
 # model, no network. playwright.config.ts gives explicit ports; scripts/e2e-frontend.sh builds Next.js only with an
 # explicit backend origin (never :8000) and checks the built rewrite; INTELLISTUDY_E2E=1 makes next.config.ts refuse
-# a build without one. The embedding model is fetched in its own step, then loaded offline during the run.
+# a build without one. The retrieval models are fetched in their own step, then loaded offline during the run.
 # The backend workflow (backend.yml) is unchanged and still runs on every push.
 name: frontend
 
@@ -68,14 +68,18 @@ jobs:
           --index-url https://pypi.org/simple
           --extra-index-url https://download.pytorch.org/whl/cpu
           --index-strategy unsafe-best-match
-      - name: cache the embedding model (BAAI/bge-small-en-v1.5, ai/chunking/config.py)
+      # Retrieval uses two models: the embedder (ai/chunking/config.py) and, for chat, the cross-encoder re-ranker
+      # (ai/retrieval/rerank.py). The E2E backend loads them offline, so both are fetched here first.
+      - name: cache the retrieval models (BAAI/bge-small-en-v1.5, cross-encoder/ms-marco-MiniLM-L-6-v2)
         uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
-          key: hf-bge-small-en-v1.5-${{ hashFiles('requirements.lock.txt') }}
-      - name: fetch the embedding model before the tests (a no-op when cached)
+          key: hf-bge-small-en-v1.5-msmarco-minilm-l6-${{ hashFiles('requirements.lock.txt') }}
+      - name: fetch the retrieval models before the tests (a no-op when cached)
         working-directory: .
-        run: python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
+        run: >-
+          python -c "from sentence_transformers import SentenceTransformer, CrossEncoder;
+          SentenceTransformer('BAAI/bge-small-en-v1.5'); CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')"
       - uses: actions/setup-node@v4
         with:
           node-version: "24.22.3"

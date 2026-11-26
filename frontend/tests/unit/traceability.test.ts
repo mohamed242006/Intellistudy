@@ -67,7 +67,7 @@ describe("gate traceability", () => {
   });
 
   it("GF1-27 the frontend CI keeps every check and runs the isolated E2E with the deterministic provider", () => {
-    for (const step of ["npm ci", "npm run lint", "npm run typecheck", "npm test", "npm audit --audit-level=high", "npm run build", "npx playwright test", "git diff --exit-code -- lib/api/openapi.json lib/api/schema.d.ts", "tesseract-ocr", "INTELLISTUDY_E2E: \"1\"", "DETERMINISTIC TEST PROVIDER"]) {
+    for (const step of ["npm ci", "npm run lint", "npm run typecheck", "npm test", "npm audit --audit-level=high", "npm run build", "npx playwright test", "git diff --exit-code -- lib/api/openapi.json lib/api/schema.d.ts", "tesseract-ocr", "INTELLISTUDY_E2E: \"1\"", "DETERMINISTIC TEST PROVIDER", "SentenceTransformer('BAAI/bge-small-en-v1.5')", "CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')"]) {
       expect(WORKFLOW, step).toContain(step);
     }
     expect(WORKFLOW).not.toMatch(/DEEPSEEK_API_KEY|OPENAI_API_KEY|secrets\.(?!GITHUB_TOKEN)/);
