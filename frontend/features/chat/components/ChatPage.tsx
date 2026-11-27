@@ -27,6 +27,7 @@ import { useNow } from "@/lib/format/use-now";
 import { useRetryAfter, waitPhrase } from "@/lib/hooks/use-retry-after";
 import { useConversation, useConversations, useCreateConversation, useDeleteConversation, useSendMessage } from "../hooks";
 import { FIGMA, PROVISIONAL, SEND_ERRORS } from "../strings";
+import { takeHandoff } from "@/features/documents/handoff";
 import { starterQuestions } from "../clarify";
 import { AssistantMessage, PendingAnswer, UserBubble, type ChatContext } from "./ChatMessage";
 
@@ -83,11 +84,15 @@ export function ChatPage({ courseId }: { courseId: string }) {
   const remove = useDeleteConversation(courseId);
   const [deleting, setDeleting] = useState(false);
   const deleteCancel = useRef<HTMLButtonElement>(null);
+  // "Ask selected materials" from the workspace: answers come only from those files until the reader widens the scope.
+  const [scopeIds, setScopeIds] = useState<string[]>(() => (params.get("from") === "workspace" ? takeHandoff(courseId, "chat") : []));
 
   const { id: requested, invalid } = parseConversationParam(params.get("c"));
   const list = conversations.data?.pages.flatMap((p) => p.items) ?? [];
   const firstId = list[0]?.id ?? null;
-  const ready = documents.documents.filter((d) => d.status === "ready").map((d) => ({ id: d.id, file_name: d.file_name }));
+  const allReady = documents.documents.filter((d) => d.status === "ready").map((d) => ({ id: d.id, file_name: d.file_name }));
+  const scoped = scopeIds.filter((id) => allReady.some((d) => d.id === id));
+  const ready = scoped.length ? allReady.filter((d) => scoped.includes(d.id)) : allReady;
   const readyFiles = ready.length;
 
   // No `?c`: open the most recently active conversation (the backend lists them newest first).
@@ -172,7 +177,15 @@ export function ChatPage({ courseId }: { courseId: string }) {
         {invalid ? (
           <ResourceNotFound />
         ) : requested ? (
-          <Conversation key={requested} courseId={courseId} conversationId={requested} readyFiles={documents.isSuccess ? readyFiles : null} files={ready} />
+          <Conversation
+            key={requested}
+            courseId={courseId}
+            conversationId={requested}
+            readyFiles={documents.isSuccess ? readyFiles : null}
+            files={ready}
+            scopeIds={scoped}
+            onWidenScope={() => setScopeIds([])}
+          />
         ) : conversations.isSuccess && list.length === 0 ? (
           <div className="px-4 py-10">
             <EmptyState
@@ -229,14 +242,17 @@ export function ChatPage({ courseId }: { courseId: string }) {
 }
 
 /** One conversation: history, the pending exchange, the composer and this conversation's source selection. */
-function Conversation({ courseId, conversationId, readyFiles, files }: {
+function Conversation({ courseId, conversationId, readyFiles, files, scopeIds = [], onWidenScope }: {
   courseId: string;
   conversationId: string;
   readyFiles: number | null;
   files: ReadonlyArray<{ id: string; file_name: string }>;
+  /** Ready files the questions are limited to (empty: every ready file of the course). */
+  scopeIds?: readonly string[];
+  onWidenScope?: () => void;
 }) {
   const detail = useConversation(conversationId);
-  const send = useSendMessage(courseId, conversationId);
+  const send = useSendMessage(courseId, conversationId, scopeIds);
   const retryAfter = useRetryAfter();
   const toast = useToast();
   const [draft, setDraft] = useState("");
@@ -388,7 +404,7 @@ function Conversation({ courseId, conversationId, readyFiles, files }: {
               loadingPlaceholder={FIGMA.loadingPlaceholder}
               sendLabel={FIGMA.send}
               pendingLabel={FIGMA.answering}
-              scope={readyFiles === null ? null : FIGMA.scope(readyFiles)}
+              scope={readyFiles === null ? null : scopeIds.length ? PROVISIONAL.scopedTo(scopeIds.length) : FIGMA.scope(readyFiles)}
               error={problem}
               maxLength={MAX_QUESTION_CHARS * 2}
               inputRef={input}
@@ -400,6 +416,14 @@ function Conversation({ courseId, conversationId, readyFiles, files }: {
                 ) : null
               }
             />
+            {scopeIds.length && onWidenScope ? (
+              <p className="flex flex-wrap items-center gap-2 text-caption text-fg-secondary">
+                <span className="min-w-0 wrap-anywhere">{PROVISIONAL.scopeFiles(files.map((f) => f.file_name))}</span>
+                <button type="button" onClick={onWidenScope} className="min-h-11 rounded-md px-2 text-label text-accent-fg hover:bg-accent-subtle">
+                  {PROVISIONAL.useAllFiles}
+                </button>
+              </p>
+            ) : null}
             <p className="text-caption text-fg-secondary">{FIGMA.disclaimer}</p>
           </div>
         </div>

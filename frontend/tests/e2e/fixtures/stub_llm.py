@@ -90,6 +90,12 @@ def quiz_reply(user: str, sources: list[tuple[str, str]]) -> str:
     return json.dumps({"questions": questions})
 
 
+#: The first summary request whose sources contain this marker fails with 503 (the model is "down"), later ones succeed:
+#: a deterministic way to show a failed summary and a successful retry (fixture flaky-summary.pdf).
+FLAKY_MARKER = "Flakysummary"
+_flaky_failed: set[str] = set()
+
+
 def reply_for(messages: list[dict[str, str]]) -> tuple[int, str]:
     system = messages[0]["content"] if messages else ""
     user = messages[-1]["content"] if messages else ""
@@ -99,6 +105,9 @@ def reply_for(messages: list[dict[str, str]]) -> tuple[int, str]:
     if "practice questions" in system:
         return 200, quiz_reply(user, sources)
     if "study summary" in system:
+        if FLAKY_MARKER in user and FLAKY_MARKER not in _flaky_failed:
+            _flaky_failed.add(FLAKY_MARKER)
+            return 503, ""
         return 200, "\n\n".join(f"### [{tag}]\n{first_sentence(body)} [{tag}]." for tag, body in sources)
     question = user.rsplit("Question:", 1)[-1].strip().lower()
     if "outage" in question:

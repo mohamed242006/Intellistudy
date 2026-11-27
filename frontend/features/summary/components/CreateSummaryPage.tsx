@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -20,14 +20,11 @@ import { relativeTime } from "@/lib/format/format";
 import { useNow } from "@/lib/format/use-now";
 import { useRetryAfter } from "@/lib/hooks/use-retry-after";
 import { queryKeys } from "@/lib/query/keys";
-import { createCourseSummary, requestSummary } from "../api";
-import { useCourseSummaries } from "../hooks";
+import { combinedSummaryHref, useCourseSummaries, useCreateSummary } from "../hooks";
 import { summaryRequestError } from "../messages";
 import { COMBINED, PROVISIONAL } from "../strings";
 
-export const singleSummaryHref = (courseId: string, documentId: string) =>
-  `/courses/${encodeURIComponent(courseId)}/documents/${encodeURIComponent(documentId)}/summary`;
-export const combinedSummaryHref = (summaryId: string) => `/summaries/${encodeURIComponent(summaryId)}`;
+export { combinedSummaryHref, singleSummaryHref } from "../hooks";
 
 /**
  * Create a summary from one, several or all ready files (GET /courses/{id}/summaries/new is this page). One file uses
@@ -122,18 +119,7 @@ function SummaryForm({ courseId, documents, preselected }: { courseId: string; d
     }
   }, [dropped.length, documents]);
 
-  const create = useMutation({
-    mutationFn: async (ids: string[]) => {
-      if (ids.length === 1) {
-        await requestSummary(ids[0]!, false);
-        return singleSummaryHref(courseId, ids[0]!);
-      }
-      const summary = await createCourseSummary(courseId, ids);
-      client.setQueryData(queryKeys.courseSummary(summary.id), summary);
-      void client.invalidateQueries({ queryKey: queryKeys.courseSummariesOf(courseId) });
-      return combinedSummaryHref(summary.id);
-    },
-  });
+  const create = useCreateSummary(courseId);
 
   const count = kept.length;
   const submit = (event: FormEvent) => {

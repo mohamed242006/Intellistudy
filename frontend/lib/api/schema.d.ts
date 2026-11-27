@@ -917,7 +917,7 @@ export interface components {
              * Database
              * @enum {string}
              */
-            database: "ok" | "error";
+            database: "ok" | "error" | "outdated";
             llm: components["schemas"]["LLMStatus"];
             /** Models */
             models: {

@@ -70,7 +70,7 @@ test("ADD-E2E several materials are added with “Add these files” and the pag
 test("SEL-E2E Select all picks ready files only; one combined summary is grounded in all of them", async () => {
   test.setTimeout(180_000);
   await page.goto(workspaceUrl);
-  await page.getByRole("link", { name: "Summaries" }).click();
+  await page.getByRole("link", { name: "All summaries" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Create a summary" })).toBeVisible();
   const failed = page.getByRole("checkbox", { name: "damaged.pdf, Processing failed" });
   await expect(failed).toBeDisabled();

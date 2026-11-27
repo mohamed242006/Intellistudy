@@ -43,20 +43,29 @@ const user = () => userEvent.setup({ applyAccept: false });
 const pdf = (name: string, size = 1000) => Object.defineProperty(new File(["%PDF-1.4"], name, { lastModified: size }), "size", { value: size });
 
 describe("GF0B-10 Course Workspace", () => {
-  it("GF0B-10 shows the course, a real Files indexed stat, the Materials list and the selected file's details", async () => {
+  it("GF0B-10 shows the course, real file stats, the Materials list with checkboxes and the previewed file's details", async () => {
     const ready = doc({ file_name: "lecture-1.pdf", page_count: 48, size_bytes: 3_100_000 });
     const busy = doc({ file_name: "lecture-2.pdf", status: "extracting", page_count: null, ready_at: null });
     const broken = doc({ file_name: "notes.docx", file_type: "docx", status: "failed", error_code: "corrupted", page_count: null, ready_at: null });
-    signedInBackend().on(`GET /courses/${COURSE_ID}`, () => json(200, course())).on(DOCS, () => json(200, page([ready, busy, broken], 100)));
+    signedInBackend()
+      .on(`GET /courses/${COURSE_ID}`, () => json(200, course()))
+      .on(DOCS, () => json(200, page([ready, busy, broken], 100)))
+      .on(`GET /courses/${COURSE_ID}/summaries`, () => json(200, page([])))
+      .on(`GET /courses/${COURSE_ID}/quizzes`, () => json(200, page([])))
+      .on(`GET /documents/${ready.id}/summary`, () => json(200, { document_id: ready.id, status: "ready", pending: false, error_code: null, sections: [], citations: [], warnings: [], grounding: null, chunk_count: 1, model: "m", generated_at: "2026-11-25T10:00:00Z" }));
     workspace();
     expect(await screen.findByRole("heading", { level: 1, name: "Queueing Theory" })).toBeVisible();
     const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(crumbs).getByRole("link", { name: "Courses" })).toHaveAttribute("href", "/#courses");
-    expect(await screen.findByText("1 of 3")).toBeVisible();
-    expect(screen.getByText("1 processing · 1 failed")).toBeVisible();
+    expect(await screen.findByText("Ready · 1 processing")).toBeVisible();
+    expect(screen.getByTestId("workspace-count")).toHaveTextContent("0 of 1 file selected");
     const materials = screen.getByRole("region", { name: "Materials" });
     expect(within(materials).getAllByRole("listitem")).toHaveLength(3);
-    expect(within(materials).getByRole("link", { name: /lecture-1\.pdf/ })).toHaveAttribute("aria-current", "true");
+    expect(within(materials).getByRole("link", { name: /^Preview lecture-1\.pdf/ })).toHaveAttribute("aria-current", "true");
+    expect(within(materials).getByRole("checkbox", { name: "Select lecture-1.pdf" })).toBeEnabled();
+    const disabled = within(materials).getByRole("checkbox", { name: "Select lecture-2.pdf" });
+    expect(disabled).toBeDisabled();
+    expect(disabled).toHaveAccessibleDescription(/Can’t be selected: extracting/);
     const details = screen.getByRole("region", { name: "lecture-1.pdf" });
     expect(within(details).getByText("3.1 MB")).toBeVisible();
     expect(within(details).getByText("48")).toBeVisible();
@@ -65,7 +74,8 @@ describe("GF0B-10 Course Workspace", () => {
     expect(document.body.textContent).not.toMatch(/mastery|Topics found|OCR/i);
     expect(within(details).getByRole("link", { name: "Generate quiz" })).toHaveAttribute("href", `/courses/${COURSE_ID}/quizzes?document=${ready.id}`);
     expect(screen.getByRole("link", { name: "Ask your materials" })).toHaveAttribute("href", `/courses/${COURSE_ID}/chat`);
-    expect(within(details).getByRole("link", { name: "Open summary" })).toHaveAttribute("href", `/courses/${COURSE_ID}/documents/${ready.id}/summary`);
+    // a summary exists, so (and only then) the panel offers to open it
+    expect(await within(details).findByRole("link", { name: "Open summary" })).toHaveAttribute("href", `/courses/${COURSE_ID}/documents/${ready.id}/summary`);
     expect(screen.getAllByRole("link", { name: "Courses" }).some((a) => a.getAttribute("aria-current") === "page")).toBe(true);
   });
 
@@ -136,7 +146,7 @@ describe("GF0B-13 delete course", () => {
       .on(DOCS, () => json(200, page([doc(), doc()], 100)))
       .on(`DELETE /courses/${COURSE_ID}`, () => new Response(null, { status: 204 }));
     const { queryClient } = workspace();
-    await screen.findByText("2 of 2");
+    expect(await screen.findByTestId("workspace-count")).toHaveTextContent("0 of 2 files selected");
     await userEvent.click(screen.getByRole("button", { name: "Delete course" }));
     const dialog = screen.getByRole("dialog", { name: "Delete this course?" });
     expect(dialog).toHaveAccessibleDescription("This removes 2 files, their summaries, chat history and quiz results. This can’t be undone.");
@@ -203,10 +213,10 @@ describe("GF0B-21 delete document", () => {
     await userEvent.click(confirm);
     expect(confirm).toHaveAttribute("aria-busy", "true");
     expect(backend.count(`DELETE /documents/${target.id}`)).toBe(1);
-    expect(within(screen.getByRole("region", { name: "Materials" })).getByText("old.pdf")).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Materials" })).getByRole("link", { name: /^Preview old\.pdf/ })).toBeVisible();
     hold.resolve();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    await waitFor(() => expect(within(screen.getByRole("region", { name: "Materials" })).queryByText("old.pdf")).toBeNull());
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Materials" })).queryByRole("link", { name: /^Preview old\.pdf/ })).toBeNull());
     expect(await screen.findByText("File deleted.")).toBeVisible();
   });
 

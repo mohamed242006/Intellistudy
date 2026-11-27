@@ -69,7 +69,7 @@ export function SidebarShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const current = activeKey(pathname);
   return (
-    <div className="min-h-screen bg-canvas lg:flex">
+    <div className="min-h-screen lg:flex">
       <SkipLink />
       <aside className="sticky top-0 hidden h-screen w-sidebar shrink-0 flex-col gap-1 overflow-y-auto border-r border-line bg-surface px-4 py-6 lg:flex">
         <Link href="/" aria-label={PROVISIONAL.homeLink} className="flex h-14 w-[132px] items-center rounded-md">
@@ -102,7 +102,7 @@ export function RailShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const current = activeKey(pathname);
   return (
-    <div className="min-h-screen bg-canvas lg:flex">
+    <div className="min-h-screen lg:flex">
       <SkipLink />
       <aside className="sticky top-0 hidden h-screen w-rail shrink-0 flex-col items-center gap-1 border-r border-line bg-surface py-6 lg:flex">
         <Link href="/" aria-label={PROVISIONAL.homeLink} className="flex h-14 w-8 items-center rounded-md">

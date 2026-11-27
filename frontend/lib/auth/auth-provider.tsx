@@ -9,6 +9,7 @@
  * - Sign-out (here or in another tab) and session expiry clear the token and the TanStack Query cache.
  */
 
+import { clearHandoffs } from "@/features/documents/handoff";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { onSessionExpired } from "@/lib/api/client";
@@ -45,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (reason: AuthContextValue["endReason"]) => {
       tokenStore.clear();
       queryClient.clear();
+      clearHandoffs(); // checked-file hand-offs are per-session application state
       setUser(null);
       setEndReason(reason);
       setStatus("anonymous");

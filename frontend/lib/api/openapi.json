@@ -1208,7 +1208,8 @@
           "database": {
             "enum": [
               "ok",
-              "error"
+              "error",
+              "outdated"
             ],
             "title": "Database",
             "type": "string"

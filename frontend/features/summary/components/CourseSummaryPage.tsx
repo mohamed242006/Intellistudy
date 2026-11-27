@@ -23,7 +23,7 @@ import { splitStatements } from "@/lib/citations/parse";
 import { relativeTime } from "@/lib/format/format";
 import { useNow } from "@/lib/format/use-now";
 import { useCourseSummary, useDeleteCourseSummary } from "../hooks";
-import { generationFailure } from "../messages";
+import { generationFailure, summaryLoadProblem } from "../messages";
 import { COMBINED, FIGMA, PROVISIONAL } from "../strings";
 import { parseSourceParam } from "./SummaryPage";
 
@@ -71,9 +71,10 @@ function Loaded({ summaryId }: { summaryId: string }) {
   if (summary.isError && summary.error instanceof ApiError && summary.error.kind === "not_found") return <ResourceNotFound />;
   if (summary.isPending) return <div aria-busy="true" role="status" aria-label={PROVISIONAL.summary} className="min-h-[50vh]" />;
   if (!data) {
+    const problem = summaryLoadProblem(summary.error);
     return (
       <div role="alert" className="flex flex-col items-start gap-4 px-4 py-10 lg:px-12">
-        <Notice tone="warning" title={PROVISIONAL.loadError} body={PROVISIONAL.loadErrorBody} />
+        <Notice tone="warning" title={problem.title} body={problem.body} />
         <Button variant="secondary" onClick={() => void summary.refetch()}>
           {PROVISIONAL.tryAgain}
         </Button>

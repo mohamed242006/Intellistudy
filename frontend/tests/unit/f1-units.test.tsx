@@ -337,7 +337,10 @@ describe("GF1-05 GF1-16 error copy", () => {
     expect(summaryRequestError(err(429, "rate_limited", "120"))).toBe("Too many summary requests in the last hour. Try again in 2 minutes.");
     expect(summaryRequestError(err(429, "token_budget", "3600"))).toBe("Your daily AI budget is used up. Try again tomorrow.");
     expect(summaryRequestError(new ApiError({ kind: "network", status: 0 }))).toMatch(/offline/);
-    expect(summaryRequestError(err(500, "boom"))).toBe("That didn’t work. Try again.");
+    // a server error is called a server error, never "check your connection"; the body is still never shown
+    expect(summaryRequestError(err(500, "boom"))).toBe("The server hit an error while handling this summary. Try again; if it keeps happening, check the server log.");
+    expect(summaryRequestError(err(503, "database_outdated"))).toMatch(/needs a database update/);
+    expect(summaryRequestError(err(418, "boom"))).toBe("That didn’t work. Try again.");
     expect(generationFailure("ungrounded")).toMatch(/No statement could be backed/);
     expect(generationFailure("mystery")).toMatch(/Something went wrong/);
   });

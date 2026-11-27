@@ -50,7 +50,18 @@ export const FAILURE: Readonly<Record<string, string>> = {
   not_found: "This file no longer exists.",
   session_expired: "Your session expired. Sign in again.",
   fallback: "That didn’t work. Try again.",
+  database_outdated: "The server needs a database update before summaries work. Ask the administrator to apply the migrations.",
+  server: "The server hit an error while handling this summary. Try again; if it keeps happening, check the server log.",
 };
+
+/** Why a summary could not be LOADED (not why it failed to generate); never "check your connection" for server errors. */
+export const LOAD_PROBLEM = {
+  network: { title: "You appear to be offline", body: "Check your connection and try again." },
+  database_outdated: { title: "The server needs an update", body: "Its database is older than this version of IntelliStudy. An administrator must apply the database migrations." },
+  server: { title: "The server couldn’t load this summary", body: "This is a server error, not your connection. Try again; if it keeps happening, check the server log." },
+  session: { title: "Your session expired", body: "Sign in again to continue." },
+  other: { title: "Couldn’t load this summary", body: "Try again in a moment." },
+} as const;
 
 /** Creating a summary from selected files, and the combined-summary page. */
 export const COMBINED = {

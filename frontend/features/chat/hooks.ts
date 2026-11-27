@@ -63,10 +63,10 @@ export function useDeleteConversation(courseId: string) {
  * Send one question. The stored exchange returned by the backend (201) is appended to this conversation's cache, with
  * its server id and time; nothing is shown as an answer before that. Never retried automatically.
  */
-export function useSendMessage(courseId: string, conversationId: string) {
+export function useSendMessage(courseId: string, conversationId: string, documentIds?: readonly string[]) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (question: string) => sendMessage(conversationId, question),
+    mutationFn: (question: string) => sendMessage(conversationId, question, documentIds),
     onSuccess: (message: MessageOut) => {
       client.setQueryData<ConversationDetail>(queryKeys.conversation(conversationId), (data) =>
         data && !data.messages.some((m) => m.id === message.id) ? { ...data, updated_at: message.created_at, messages: [...data.messages, message] } : data,

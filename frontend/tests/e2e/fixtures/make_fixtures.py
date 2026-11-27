@@ -11,6 +11,7 @@ Writes into the directory given as the only argument:
                       carries prompt-injection and markup text
   large-lecture.pptx  valid PowerPoint over 10 MB (incompressible images): the Next.js proxy must forward it whole
   renamed-video.pptx  not a PowerPoint (an MP4 header) under a .pptx name: refused in the browser, never uploaded
+  flaky-summary.pdf   valid text PDF with a marker word: the test model fails its first summary once (retry succeeds)
   hostile-text.pdf    valid text PDF whose first sentence is prompt-injection and markup text (F-M3-03, F-M4-03);
                       the deterministic test provider quotes first sentences, so it reaches summaries and answers
 Uses python-docx and python-pptx from the backend's locked environment.
@@ -110,6 +111,7 @@ def main(target: Path) -> None:
     (target / "hostile.pdf").write_bytes(pdf(wrap("Hostile name fixture. " + SENTENCES * 4)))
     (target / "quiz-notes.pdf").write_bytes(pdf(wrap(QUIZ_FACTS)))
     (target / "hostile-text.pdf").write_bytes(pdf(wrap(HOSTILE + SENTENCES * 3)))
+    (target / "flaky-summary.pdf").write_bytes(pdf(wrap("Flakysummary notes. " + SENTENCES * 2)))
     (target / "blank.pdf").write_bytes(pdf([]))
     (target / "damaged.pdf").write_bytes(b"%PDF-1.4\n" + bytes(range(256)) * 64)
 

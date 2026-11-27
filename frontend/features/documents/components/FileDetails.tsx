@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Button, ButtonLink } from "@/design-system/components/Button";
 import { Tag, type TagTone } from "@/design-system/components/Tag";
 import type { DocumentOut } from "@/lib/api/types";
@@ -10,12 +11,12 @@ import { FIGMA, PROVISIONAL } from "../strings";
 const TAG_TONE: Record<string, TagTone> = { extracting: "accent", indexed: "success", failed: "danger", unsupported: "danger", empty: "danger" };
 
 /**
- * Selected-file details (UI §8.3 right column; gate GF0B-10). Backend fields only: type, size, pages or slides, upload
- * and index times. "Ask about this file" (no per-file chat scope in the UI yet) and topic chips (no backend data) are
- * not rendered. Actions: Open summary (F1) and Generate quiz (F2) for ready files, Download, Retry (Failed only),
- * Delete file.
+ * Previewed-file details (right panel; gate GF0B-10). Backend fields only: type, size, pages or slides, upload and index
+ * times. The summary action comes from the caller, which knows the file's real summary state, so "Open summary" is
+ * only offered for a summary that exists (none → Create summary; generating → processing; failed → Retry summary).
+ * Other actions: Generate quiz for ready files, Download, Retry processing (Failed only), Delete file.
  */
-export function FileDetails({ document, now, onDownload, downloading, onRetry, retrying, onDelete, summaryHref, quizHref }: {
+export function FileDetails({ document, now, onDownload, downloading, onRetry, retrying, onDelete, summaryAction, quizHref }: {
   document: DocumentOut;
   now: Date;
   onDownload: () => void;
@@ -23,7 +24,8 @@ export function FileDetails({ document, now, onDownload, downloading, onRetry, r
   onRetry: () => void;
   retrying: boolean;
   onDelete: () => void;
-  summaryHref: string;
+  /** The summary control for this file (state-aware), shown for ready files. */
+  summaryAction: ReactNode;
   quizHref: string;
 }) {
   const view = documentView(document, now);
@@ -32,7 +34,7 @@ export function FileDetails({ document, now, onDownload, downloading, onRetry, r
   rows.push([PROVISIONAL.uploaded, relativeTime(document.created_at, now)]);
   if (document.status === "ready" && document.ready_at) rows.push([FIGMA.indexedAt, relativeTime(document.ready_at, now)]);
   return (
-    <section aria-labelledby="selected-file-name" className="flex flex-col gap-4">
+    <section aria-labelledby="selected-file-name" className="motion-enter-fast flex flex-col gap-4">
       {/* text/secondary, not tertiary: tertiary is below 4.5:1 on the canvas background (same decision as F0-A) */}
       <p className="text-caption-strong text-fg-secondary">{FIGMA.selectedFile}</p>
       <h2 id="selected-file-name" className="text-h3 wrap-anywhere text-fg">
@@ -51,11 +53,7 @@ export function FileDetails({ document, now, onDownload, downloading, onRetry, r
         ))}
       </dl>
       <div className="flex flex-col gap-3">
-        {document.status === "ready" ? (
-          <ButtonLink href={summaryHref} fullWidth>
-            {FIGMA.openSummary}
-          </ButtonLink>
-        ) : null}
+        {document.status === "ready" ? summaryAction : null}
         {document.status === "ready" ? (
           <ButtonLink href={quizHref} variant="secondary" fullWidth>
             {FIGMA.generateQuiz}

@@ -22,7 +22,7 @@ import { relativeTime } from "@/lib/format/format";
 import { useRetryAfter } from "@/lib/hooks/use-retry-after";
 import { useNow } from "@/lib/format/use-now";
 import { useRequestSummary, useSummary } from "../hooks";
-import { generationFailure, summaryRequestError } from "../messages";
+import { generationFailure, summaryLoadProblem, summaryRequestError } from "../messages";
 import { FIGMA, PROVISIONAL } from "../strings";
 
 /** `?source=n`: a positive integer naming one of this summary's citation numbers; anything else is ignored. */
@@ -61,9 +61,10 @@ export function SummaryPage({ courseId, documentId }: { courseId: string; docume
   if (document.data && !doc) return <ResourceNotFound />; // a file of another course is not shown under this course
   if (document.isPending || course.isPending) return <div aria-busy="true" role="status" aria-label={PROVISIONAL.summary} className="min-h-[50vh]" />;
   if (!doc || course.isError) {
+    const problem = summaryLoadProblem(document.error ?? course.error);
     return (
       <div role="alert" className="flex flex-col items-start gap-4 px-4 py-10 lg:px-12">
-        <Notice tone="warning" title={PROVISIONAL.loadError} body={PROVISIONAL.loadErrorBody} />
+        <Notice tone="warning" title={problem.title} body={problem.body} />
         <Button variant="secondary" onClick={() => void Promise.all([document.refetch(), course.refetch()])}>
           {PROVISIONAL.tryAgain}
         </Button>
@@ -133,7 +134,7 @@ export function SummaryPage({ courseId, documentId }: { courseId: string; docume
           <div aria-busy="true" role="status" aria-label={PROVISIONAL.summary} className="h-40" />
         ) : summary.isError && data === undefined ? (
           <div role="alert" className="flex flex-col items-start gap-4">
-            <Notice tone="warning" title={PROVISIONAL.loadError} body={PROVISIONAL.loadErrorBody} />
+            <Notice tone="warning" title={summaryLoadProblem(summary.error).title} body={summaryLoadProblem(summary.error).body} />
             <Button variant="secondary" onClick={() => void summary.refetch()}>
               {PROVISIONAL.tryAgain}
             </Button>

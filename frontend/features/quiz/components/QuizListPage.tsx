@@ -14,6 +14,7 @@ import { useCourse } from "@/features/courses/hooks";
 import { FIGMA as COURSE_FIGMA } from "@/features/courses/strings";
 import { DocumentPicker } from "@/features/documents/components/DocumentPicker";
 import { useDocuments } from "@/features/documents/hooks";
+import { takeHandoff } from "@/features/documents/handoff";
 import { SELECTION_COPY, prune } from "@/features/documents/selection";
 import { ApiError } from "@/lib/api/errors";
 import type { DocumentOut, QuizOut } from "@/lib/api/types";
@@ -96,7 +97,14 @@ export function QuizListPage({ courseId }: { courseId: string }) {
         {documents.isPending ? <div aria-busy="true" role="status" aria-label={PROVISIONAL.loading} className="h-10" /> : null}
         {documents.isSuccess && ready.length === 0 ? <Notice tone="info" title={PROVISIONAL.noReadyFiles} /> : null}
         {documents.isSuccess && documents.documents.length > 0 ? (
-          <GenerateForm key={preselected ?? "none"} courseId={courseId} all={documents.documents} ready={ready} preselected={preselected && ready.some((d) => d.id === preselected) ? preselected : null} />
+          <GenerateForm
+            key={preselected ?? "none"}
+            courseId={courseId}
+            all={documents.documents}
+            ready={ready}
+            preselected={preselected && ready.some((d) => d.id === preselected) ? preselected : null}
+            fromWorkspace={params.get("from") === "workspace"}
+          />
         ) : null}
       </section>
 
@@ -150,12 +158,25 @@ function QuizRow({ quiz, now }: { quiz: QuizOut; now: Date }) {
   );
 }
 
-function GenerateForm({ courseId, all, ready, preselected }: { courseId: string; all: DocumentOut[]; ready: DocumentOut[]; preselected: string | null }) {
+function GenerateForm({ courseId, all, ready, preselected, fromWorkspace = false }: {
+  courseId: string;
+  all: DocumentOut[];
+  ready: DocumentOut[];
+  preselected: string | null;
+  /** The workspace handed over its checked files (Create quiz from the workspace toolbar). */
+  fromWorkspace?: boolean;
+}) {
   const router = useRouter();
   const create = useCreateQuiz(courseId);
   const retryAfter = useRetryAfter();
   const ids = useId();
-  const [form, setForm] = useState<QuizForm>({ title: "", count: "10", mcq: true, trueFalse: true, documents: preselected ? [preselected] : [] });
+  const [form, setForm] = useState<QuizForm>(() => ({
+    title: "",
+    count: "10",
+    mcq: true,
+    trueFalse: true,
+    documents: preselected ? [preselected] : fromWorkspace ? takeHandoff(courseId, "quiz") : [],
+  }));
   const [errors, setErrors] = useState<QuizFormErrors>({});
   const [problem, setProblem] = useState<string | null>(null);
   // Files that stop being ready (deleted, reprocessed) leave the selection, and the reader is told.

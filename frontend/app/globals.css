@@ -8,6 +8,26 @@
     color: var(--color-fg);
   }
 
+  /*
+   * App backdrop: the canvas with two restrained radial washes of the brand accent and a faint dot grid. Low contrast
+   * by construction (accent/subtle on canvas), fixed so it never scrolls under reading content, and token-based, so the
+   * Dark theme gets its own subtle version. Text always sits on surfaces (cards, panels) above it.
+   */
+  body {
+    background-image:
+      radial-gradient(60rem 40rem at 100% -10%, color-mix(in srgb, var(--color-accent-subtle) 90%, transparent), transparent 70%),
+      radial-gradient(50rem 36rem at -10% 110%, color-mix(in srgb, var(--color-accent-subtle) 75%, transparent), transparent 70%),
+      radial-gradient(color-mix(in srgb, var(--color-accent-subtle-border) 45%, transparent) 1px, transparent 1.2px);
+    background-size: auto, auto, 22px 22px;
+    background-attachment: fixed;
+  }
+
+  /* Button press: a 1 px settle on press, on top of the colour change (no layout effect: transform only). */
+  button:not(:disabled):active,
+  a[data-variant]:active {
+    transform: translateY(1px);
+  }
+
   /* Visible 2 px focus ring on everything focusable (spec §4, §12); inputs draw their own inside ring. */
   :focus-visible {
     outline: 2px solid var(--color-focus-ring);
@@ -94,18 +114,20 @@
 
 @layer utilities {
   /* Page or block entrance: motion/slow fade + 4 px rise. */
+  /* fill-mode backwards (not both): nothing is retained after the animation, so no leftover transform turns this
+     wrapper into the containing block of position:fixed descendants (the mobile batch bar, sheets). */
   .motion-enter {
-    animation: is-enter var(--is-motion-slow) var(--is-ease-standard) both;
+    animation: is-enter var(--is-motion-slow) var(--is-ease-standard) backwards;
   }
 
   /* Smaller pieces (messages, revealed panels, accordion bodies, rows): motion/base. */
   .motion-enter-fast {
-    animation: is-enter var(--is-motion-base) var(--is-ease-standard) both;
+    animation: is-enter var(--is-motion-base) var(--is-ease-standard) backwards;
   }
 
   /* Children enter one after another, 40 ms apart, capped so long lists never wait. */
   .motion-stagger > * {
-    animation: is-enter var(--is-motion-base) var(--is-ease-standard) both;
+    animation: is-enter var(--is-motion-base) var(--is-ease-standard) backwards;
   }
   .motion-stagger > :nth-child(2) { animation-delay: 40ms; }
   .motion-stagger > :nth-child(3) { animation-delay: 80ms; }
@@ -141,6 +163,63 @@
   }
 }
 
+/* Checkbox (design-system/components/Checkbox.tsx): box, drawn tick, mixed dash. */
+.is-checkbox-box {
+  border-color: var(--color-line-strong);
+  background-color: var(--color-surface);
+  color: var(--color-fg-on-accent);
+  transition: background-color var(--is-motion-fast) var(--is-ease-standard), border-color var(--is-motion-fast) var(--is-ease-standard),
+    transform var(--is-motion-fast) var(--is-ease-standard);
+}
+.is-checkbox input:hover:not(:disabled) + .is-checkbox-box {
+  border-color: var(--color-accent);
+}
+.is-checkbox input:checked + .is-checkbox-box,
+.is-checkbox[data-mixed] .is-checkbox-box {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.is-checkbox input:active:not(:disabled) + .is-checkbox-box {
+  transform: scale(0.9);
+}
+.is-checkbox input:focus-visible + .is-checkbox-box {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.is-checkbox input:disabled + .is-checkbox-box {
+  background-color: var(--color-disabled-bg);
+  border-color: var(--color-line);
+}
+.is-checkbox-tick path {
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  transition: stroke-dashoffset 160ms var(--is-ease-standard);
+}
+.is-checkbox input:checked + .is-checkbox-box .is-checkbox-tick path {
+  stroke-dashoffset: 0;
+}
+.is-checkbox-dash {
+  display: none;
+}
+.is-checkbox[data-mixed] .is-checkbox-tick {
+  display: none;
+}
+.is-checkbox[data-mixed] .is-checkbox-dash {
+  display: block;
+}
+
+/* Batch action bar: slides and fades in (220 ms); when closed it is hidden from everyone, after its exit. */
+.is-batch-bar {
+  transition: opacity 220ms var(--is-ease-standard), transform 220ms var(--is-ease-standard), visibility 0s linear 0s;
+}
+.is-batch-bar[data-open="false"] {
+  opacity: 0;
+  transform: translateY(12px);
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 165ms var(--is-ease-exit), transform 165ms var(--is-ease-exit), visibility 0s linear 165ms;
+}
+
 /*
  * Reduced motion (spec §9.8): no movement. The spec allows a 120 ms fade instead; entrances are switched off entirely so
  * content is final at first paint (also what the accessibility checks see). Pulses and dots stop; the spinner turns.
@@ -161,5 +240,15 @@
   .motion-pulse,
   .motion-dots > span {
     animation: none !important;
+  }
+  .is-checkbox-tick path,
+  .is-batch-bar,
+  .is-batch-bar[data-open="false"] {
+    transition: none !important;
+  }
+  button:not(:disabled):active,
+  a[data-variant]:active,
+  .is-checkbox input:active:not(:disabled) + .is-checkbox-box {
+    transform: none;
   }
 }

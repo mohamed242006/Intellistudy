@@ -22,6 +22,8 @@ export function deleteConversation(id: string): Promise<void> {
 }
 
 /** Synchronous: 201 with the stored exchange (question + answer). */
-export function sendMessage(id: string, question: string): Promise<MessageOut> {
-  return apiRequest<MessageOut>(`${conv(id)}/messages`, { method: "POST", body: { question } });
+/** `documentIds` narrows retrieval to those ready files of the course (MessageCreate.document_ids); omitted = all. */
+export function sendMessage(id: string, question: string, documentIds?: readonly string[]): Promise<MessageOut> {
+  const body = documentIds && documentIds.length ? { question, document_ids: [...new Set(documentIds)] } : { question };
+  return apiRequest<MessageOut>(`${conv(id)}/messages`, { method: "POST", body });
 }

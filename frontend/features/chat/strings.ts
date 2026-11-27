@@ -75,6 +75,9 @@ export const PROVISIONAL = {
   copyFailed: "Couldn’t copy. Select the text to copy it instead.",
   starters: "START WITH ONE OF YOUR FILES",
   sendAgain: "Send again",
+  scopedTo: (n: number) => (n === 1 ? "Answering only from 1 selected file" : `Answering only from ${n} selected files`),
+  scopeFiles: (names: readonly string[]) => `Selected: ${names.join(" · ")}`,
+  useAllFiles: "Use all files",
 } as const;
 
 /** Fixed copy for a failed send or action; never the problem body (GF1-16). */

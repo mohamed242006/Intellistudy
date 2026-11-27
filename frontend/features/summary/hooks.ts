@@ -94,3 +94,30 @@ export function useDeleteCourseSummary(courseId: string) {
     },
   });
 }
+
+export const singleSummaryHref = (courseId: string, documentId: string) =>
+  `/courses/${encodeURIComponent(courseId)}/documents/${encodeURIComponent(documentId)}/summary`;
+export const combinedSummaryHref = (summaryId: string) => `/summaries/${encodeURIComponent(summaryId)}`;
+
+/**
+ * Create a summary from the exact selected ids and resolve to the page that shows it. One file: that file's own
+ * summary (POST /documents/{id}/summary; a stored one is returned as is). Two or more: ONE combined summary
+ * (POST /courses/{id}/summaries with document_ids). Used by the workspace toolbar and the Create summary page.
+ */
+export function useCreateSummary(courseId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: readonly string[]): Promise<string> => {
+      const unique = [...new Set(ids)];
+      if (unique.length === 1) {
+        const summary = await requestSummary(unique[0]!, false);
+        client.setQueryData(queryKeys.summary(unique[0]!), summary);
+        return singleSummaryHref(courseId, unique[0]!);
+      }
+      const summary = await createCourseSummary(courseId, unique);
+      client.setQueryData(queryKeys.courseSummary(summary.id), summary);
+      void client.invalidateQueries({ queryKey: queryKeys.courseSummariesOf(courseId) });
+      return combinedSummaryHref(summary.id);
+    },
+  });
+}

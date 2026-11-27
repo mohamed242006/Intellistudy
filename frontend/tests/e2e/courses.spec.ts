@@ -201,8 +201,9 @@ test("GF0B-10 GF0B-22 GF0B-28 the workspace shows real stats and downloads the o
   expect(payload).toContain('"title","0",{"children":"IntelliStudy"}');
   expect(payload, "metadata must not be streamed as a deferred row").not.toContain('{"metadata":');
   await expect(page).toHaveURL(new RegExp(`${courseUrl}\\?file=`));
-  await expect(page.getByText("3 of 5")).toBeVisible();
-  await expect(page.getByText("2 failed")).toBeVisible();
+  await expect(page.getByTestId("workspace-count")).toHaveText("0 of 3 files selected"); // 3 ready of 5 files
+  await expect(page.getByRole("region", { name: "Materials" }).getByRole("listitem")).toHaveCount(5);
+  await expect(page.getByRole("region", { name: "Materials" }).getByRole("checkbox", { name: "Select damaged.pdf" })).toBeDisabled();
   const details = page.getByRole("region", { name: "handout.docx" });
   await expect(details).toContainText("Word (.docx)");
   const download = page.waitForEvent("download");
@@ -237,8 +238,9 @@ test("GF0B-21 a document is deleted only after confirmation", async () => {
   const deleted = page.waitForResponse((r) => r.request().method() === "DELETE" && r.url().includes("/documents/"));
   await dialog.getByRole("button", { name: "Delete file" }).click();
   expect((await deleted).status()).toBe(204);
-  await expect(materials.getByText("blank.pdf")).toHaveCount(0);
-  await expect(page.getByText("3 of 4")).toBeVisible();
+  await expect(materials.getByRole("link", { name: /^Preview blank\.pdf/ })).toHaveCount(0);
+  await expect(materials.getByRole("listitem")).toHaveCount(4);
+  await expect(page.getByTestId("workspace-count")).toHaveText("0 of 3 files selected");
 });
 
 test("GF0B-25 F-M4-03 — Frontend Rendering Safety: hostile course and file names stay inert text", async () => {
