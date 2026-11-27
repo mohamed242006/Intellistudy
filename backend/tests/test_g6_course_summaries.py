@@ -186,3 +186,68 @@ class CombinedSummaryTests(CourseSummaryCase):
         self.generate()
         view = self.get(self.a, self.a_token, response.json()["id"]).json()
         self.assertEqual((view["status"], view["error_code"], view["sections"]), ("failed", "document_not_ready", []))
+
+
+# ------------------------------------------------------------------ migration 0008 and the schema guard
+def _migrate_to(url: str, revision: str, *, down: bool = False) -> None:
+    from alembic import command
+
+    from backend.app.db.migrate import alembic_config
+    from backend.app.db.session import create_db_engine
+
+    engine = create_db_engine(url)
+    try:
+        with engine.begin() as connection:
+            config = alembic_config()
+            config.attributes["connection"] = connection
+            (command.downgrade if down else command.upgrade)(config, revision)
+    finally:
+        engine.dispose()
+
+
+def _revision(url: str) -> str | None:
+    from backend.app.db.migrate import current_revision
+    from backend.app.db.session import create_db_engine
+
+    engine = create_db_engine(url)
+    try:
+        with engine.connect() as connection:
+            return current_revision(connection)
+    finally:
+        engine.dispose()
+
+
+class SchemaGuardTests(CourseSummaryCase):
+    def test_g6_cs_14_upgrading_a_0007_database_with_data_keeps_summaries_and_quizzes(self) -> None:
+        url = self.settings.database_url
+        single = self.summary_ok(self.a, self.a_token, self.deck_id)
+        quiz = self.quiz_ok(self.a, self.a_token, self.a_course, document_ids=[self.pdf_id, self.deck_id], question_count=6)
+        _migrate_to(url, "0007_quiz_attempts", down=True)  # the schema the dev database had before this change
+        self.assertEqual(_revision(url), "0007_quiz_attempts")
+        _migrate_to(url, "head")
+        self.assertEqual(_revision(url), "0008_course_summaries")
+        self.assertEqual(self.get_summary(self.a, self.a_token, self.deck_id).json()["sections"], single["sections"])
+        self.assertEqual(self.get_quiz(self.a, self.a_token, quiz["id"]).json()["id"], quiz["id"])
+        self.assertEqual(self.combined_ok([self.pdf_id, self.deck_id])["status"], "ready")
+
+    def test_g6_cs_15_a_database_behind_the_code_is_reported_instead_of_failing_as_a_bare_500(self) -> None:
+        from fastapi.testclient import TestClient
+
+        from backend.app.main import create_app
+
+        url = self.settings.database_url
+        _migrate_to(url, "0007_quiz_attempts", down=True)
+        app = create_app(self.settings, clock=self.clock, ai=self.make_ai())
+        with self.assertLogs("backend.app.main", level="ERROR") as logs, TestClient(app, base_url="https://testserver") as client:
+            self.assertEqual(client.get("/api/v1/health").json()["database"], "outdated")
+            response = client.get(f"/api/v1/documents/{self.deck_id}/summary", headers=self.bearer(self.a_token))
+            self.assertEqual(response.status_code, 503, response.text)
+            body = response.json()
+            self.assertEqual(body["type"], "about:blank#database_outdated")
+            self.assertNotIn("course_summary_id", response.text)  # no SQL or schema detail reaches the client
+            self.assertIn("migrations", body["detail"])
+            _migrate_to(url, "head")
+            self.assertEqual(client.get("/api/v1/health").json()["database"], "ok")  # recovers without a restart
+            self.assertEqual(client.get(f"/api/v1/documents/{self.deck_id}/summary",
+                                        headers=self.bearer(self.a_token)).status_code, 404)
+        self.assertTrue(any("python -m backend.app.db.migrate" in line for line in logs.output))

@@ -31,6 +31,13 @@ uvicorn --factory backend.app.main:create_app --host 127.0.0.1 --port 8000
 
 Then open `http://127.0.0.1:8000/api/v1/health` or the interactive docs at `/docs` (disabled in `prod`).
 
+**After every pull, run the migrations again.** The service never migrates on startup. If the database is behind the
+code (for example, still at `0007` while the code expects `0008_course_summaries`), the service logs an error naming
+`python -m backend.app.db.migrate` and does not start its background workers. `/health` then reports
+`"database": "outdated"`, and affected requests answer `503 database_outdated` instead of a bare 500. Check with
+`alembic -c backend/alembic.ini current` and `heads`; fix with `python -m backend.app.db.migrate` (or
+`alembic -c backend/alembic.ini upgrade head`). Back up `data/backend/intellistudy.sqlite3` first.
+
 ## Endpoints (M1-M5)
 
 | Method and path | Auth | Notes |

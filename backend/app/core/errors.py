@@ -102,5 +102,22 @@ class UnhandledErrorMiddleware:
             logger.exception("unhandled error: %s", type(exc).__name__)
             if started:  # the response is already on the wire; nothing safe left to send
                 raise
-            response = problem(500, code="internal_error")
+            app = scope.get("app")
+            if _is_schema_error(exc) and getattr(getattr(app, "state", None), "schema_outdated", False):
+                # The database is behind the code (a migration was not applied): say so instead of a bare 500.
+                response = problem(503, DATABASE_OUTDATED, code="database_outdated")
+            else:
+                response = problem(500, code="internal_error")
             await response(scope, receive, send)
+
+
+DATABASE_OUTDATED = "The server's database needs an update. An administrator must apply the database migrations."
+_SCHEMA_MARKERS = ("no such column", "no such table", "does not exist", "undefinedcolumn", "undefinedtable")
+
+
+def _is_schema_error(exc: BaseException) -> bool:
+    """A database error caused by a missing table or column (never shown to the client, only classified)."""
+    from sqlalchemy.exc import OperationalError, ProgrammingError
+
+    return isinstance(exc, OperationalError | ProgrammingError) and any(
+        marker in str(exc).lower() for marker in _SCHEMA_MARKERS)

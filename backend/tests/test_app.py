@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
 
 from backend.app.core.config import Settings
+from backend.app.db.migrate import upgrade
 from backend.app.main import create_app
 from backend.tests.helpers import DEEPSEEK_KEY, JWT_SECRET, make_settings
 
@@ -49,6 +50,7 @@ class AppTestCase(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="intellistudy-app-")
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.settings = self.make_settings()
+        upgrade(self.settings.database_url)  # the service never migrates on startup; /health reports a stale schema
         app = create_app(self.settings)
         app.include_router(_test_routes())
         self.app = app

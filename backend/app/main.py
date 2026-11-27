@@ -10,8 +10,10 @@ missing secret, so tests can build apps with explicit settings.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,6 +32,7 @@ from backend.app.core.middleware import (
 from backend.app.core.passwords import PasswordService
 from backend.app.core.ratelimit import InMemoryRateLimiter, RateLimiter
 from backend.app.core.tokens import TokenService
+from backend.app.db.migrate import current_revision, head_revision
 from backend.app.db.session import create_db_engine, create_session_factory
 from backend.app.services.ai_container import AIContainer
 from backend.app.services.attempts import AttemptService
@@ -40,6 +43,16 @@ from backend.app.services.generation import GenerationRunner, GenerationService
 from backend.app.services.jobs import JobRunner, Parser
 from backend.app.services.storage import FileStorage
 from backend.app.services.usage import UsageLedger
+
+logger = logging.getLogger(__name__)
+
+
+def schema_outdated(engine: Any) -> str | None:
+    """"current -> head" when the database is behind this code's migrations, else None."""
+    head = head_revision()
+    with engine.connect() as connection:
+        current = current_revision(connection)
+    return None if current == head else f"{current or 'not migrated'} -> {head}"
 
 
 def create_app(
@@ -70,9 +83,15 @@ def create_app(
     attempts = AttemptService(settings, ai, limiter, clock)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         storage.sweep_incoming()  # FILE-07: partial uploads left by a crash
-        if settings.worker_enabled:
+        # The service does not migrate on startup (db/migrate.py). A database behind the code would fail on every
+        # query touching a new column, so it is detected here, logged with the fix, and reported by /health.
+        outdated = schema_outdated(engine)
+        app.state.schema_outdated = outdated
+        if outdated:
+            logger.error("database schema is behind the code (%s); run: python -m backend.app.db.migrate", outdated)
+        if settings.worker_enabled and not outdated:
             jobs.start()
             generation_runner.start()
         yield
@@ -91,6 +110,7 @@ def create_app(
         openapi_url="/openapi.json" if docs else None,
     )
     app.state.settings = settings
+    app.state.schema_outdated = None
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.state.storage = storage
