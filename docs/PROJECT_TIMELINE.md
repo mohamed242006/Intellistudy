@@ -66,5 +66,10 @@ approximate search to list stored records. Both tests were stabilised; runs #11 
 | **R1** production readiness | HTTPS and HSTS, client addresses behind a proxy, shared rate-limit store, secret management, alerting, backups; frontend renders model text as plain text | before any cloud deployment |
 | **P1** public readiness | privacy notice and recorded consent for the AI provider, account deletion | before any non-team user |
 | **M6** quality | repair split words in PDFs at ingestion, better quiz yield, question flagging | team decision |
+| **Sprint 1** security and resilience | threat model, authorization matrix, abuse controls, concurrency limits, load baseline, before/after report (rate limiting, parser defenses and security regression tests already exist) | - |
+| **Sprint 2** mastery data model | topic taxonomy, mastery events and scores, confidence, endpoints, migrations | - |
+| **Sprint 3** adaptive learning UX | mastery dashboard, weak-topic cards, personalized practice quizzes, progress | after Sprint 2 and acceptance of [T-7](TEAM_DECISION_T-7.md) (proposed) |
+| **Sprint 4** audio MVP | audio upload, transcription with timestamps, indexing, audio citations | - |
 
-Details and owners: [`RELEASE_READINESS_PLAN.md`](RELEASE_READINESS_PLAN.md).
+Details and owners: [`RELEASE_READINESS_PLAN.md`](RELEASE_READINESS_PLAN.md). Sprint status, item by item:
+[`README.md`](../README.md#roadmap).

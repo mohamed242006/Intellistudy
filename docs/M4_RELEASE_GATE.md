@@ -59,6 +59,10 @@ table only. Quiz `status`: `generating` / `ready` / `failed` / `invalid`.
 | T-5 | Scope: document summaries, multiple-choice quizzes, true/false quizzes. |
 | T-6 | Excluded: short-answer questions, essay questions, adaptive exams, LLM-based grading. Question validation in M4 is deterministic (no LLM judge). Quiz taking and grading are M5. |
 
+*Note added 2026-11-28:* an amendment to T-6 is **proposed**, not accepted, in
+[`TEAM_DECISION_T-7.md`](TEAM_DECISION_T-7.md). It would allow formative personalized practice quizzes after the
+mastery model exists; adaptive high-stakes exams stay excluded. Until the team accepts it, T-6 above applies unchanged.
+
 "Source documents" of a quiz = the documents recorded in `quiz_sources` when it was generated (the requested
 `document_ids`, or every ready document of the course when none were given).
 

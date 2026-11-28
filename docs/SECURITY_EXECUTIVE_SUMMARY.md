@@ -24,7 +24,7 @@ automated tests, and no known issue blocks the demo. Two kinds of work remain be
 | Runaway AI cost | Per-user rate limits and a daily token budget recorded in a ledger that deleting content never refunds. | Budget tests in M3 and M4. |
 | Leaked secrets | Keys only in environment variables, never in the repository, logs or responses. | Secret scanning (gitleaks) and log-redaction tests on every build. |
 
-**In numbers:** 298 release-gate checks across five milestones (each one an automated test), 402 backend tests and
+**In numbers** (at M5 approval, 2026-11-25): 298 release-gate checks across five milestones (each one an automated test), 402 backend tests and
 800 AI-pipeline tests passing in CI; all 70 rows of the contract's security test matrix mapped to tests; the OWASP Top
 10 and OWASP Top 10 for LLM Applications reviewed with **no open item**. Critical controls were proven by removing them
 one at a time and confirming the tests fail (11 for M5 alone).
@@ -48,7 +48,9 @@ one at a time and confirming the tests fail (11 for M5 alone).
 | any non-team user uploads a document | A privacy notice and consent recorded by the server, the AI provider's data terms reviewed, supervisor approval (F-M5-02); account deletion | Mohamed Amir Kamal; approval by Prof. Gamal Ebrahim | P1 |
 | later quality work | Repair split words at ingestion (F-M4-07); fewer dropped quiz questions and question flagging (F-M4-02) | Mohamed Amir Kamal | M6 |
 
-Owners and milestones confirmed 2026-11-25 in [`RELEASE_READINESS_PLAN.md`](RELEASE_READINESS_PLAN.md).
+Owners and milestones confirmed 2026-11-25 in [`RELEASE_READINESS_PLAN.md`](RELEASE_READINESS_PLAN.md). Planned
+security work beyond these gates (threat model update, authorization matrix, abuse and concurrency limits, a load
+baseline) is Sprint 1 in the [`README.md` roadmap](../README.md#roadmap). Its fixes are not made yet.
 
 ## Status
 

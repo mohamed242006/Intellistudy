@@ -1,7 +1,8 @@
 # Frontend Implementation Plan
 
 **Status:** proposal approved for implementation, 2026-11-25. **Progress (2026-11-26):** F0-A, F0-B and F1 complete
-(CI green); F2 implemented, awaiting CI ([`F2_GATE.md`](F2_GATE.md)); F3-F5 not started. Section 11.3 decisions taken
+(CI green); F2 implemented, awaiting CI ([`F2_GATE.md`](F2_GATE.md): GF2-29 recorded open, sign-off table empty);
+F3-F5 not started. Section 11.3 decisions taken
 so far are recorded in the F0A, F0B, F1 and F2 gate documents.
 **Visual source of truth:** [`figma_ui_context.md`](figma_ui_context.md) (revision 2; cited as "UI §n"), and behind it
 the Figma file itself. Nothing is redesigned, improved or invented. Where the backend cannot supply what a frame
@@ -315,3 +316,7 @@ Each milestone follows the backend's practice:
 
 The Exam builder and results screens are not planned: personalised and adaptive exams are excluded by team decision
 T-6.
+
+**Roadmap note:** F5 corresponds to Sprint 3 (adaptive learning UX) in the [`README.md` roadmap](../README.md#roadmap).
+The backend milestone it waits for is Sprint 2 (mastery data model). Personalized practice quizzes also wait for the
+proposed T-6 amendment [`TEAM_DECISION_T-7.md`](TEAM_DECISION_T-7.md). The exam builder stays excluded either way.

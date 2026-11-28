@@ -46,10 +46,15 @@ Students upload PDF / PPTX / DOCX (optionally audio/video later) and receive:
 Market analysis (ChatGPT, NotebookLM, Quizlet AI, Khanmigo, Studocu AI, CourseHero): summarization, chatbot, QA and quiz generation are
 baseline features; grounded citations plus adaptive learning are the differentiators.
 
+*Scope note (2026-11-28):* this is the original proposal. Team decision T-6 (2026-11-24) excludes adaptive exams. A
+proposed amendment, [`TEAM_DECISION_T-7.md`](TEAM_DECISION_T-7.md), would allow formative personalized practice
+quizzes instead. Mastery, weak topics and audio are not built yet; their status is in the
+[`README.md` roadmap](../README.md#roadmap).
+
 ### Tech stack
 Frontend React + Tailwind (not started; `figma_ui_context.md` recommends React + TypeScript) · Backend Python/FastAPI (M0 foundation done 2026-11-24; product endpoints M1-M5) · AI: sentence-transformers, ChromaDB, RAG ·
 DB: PostgreSQL planned (SQLite used now for parent chunks) · Documents: PyMuPDF, python-docx, python-pptx, pdfplumber, Pillow,
-Tesseract/pytesseract · Optional speech: Whisper · Deployment: Docker/Compose (not started) · VCS/CI: Git/GitHub Actions (CI not started).
+Tesseract/pytesseract · Optional speech: Whisper (an early idea; the transcription model is undecided, Sprint 4) · Deployment: Docker/Compose (not started) · VCS/CI: Git/GitHub Actions (CI not started).
 
 ### LLM strategy
 Phase 1 OpenAI API; Phase 2 self-hosted Gemma 3 27B. The architecture stays model-agnostic (an adapter interface) so the swap is small.
@@ -494,15 +499,19 @@ Platform
 18. **Vision bake-off** (decision on a Vision LLM for figures): only on the benchmark of 17, requiring a measurable gain over Phase 0 (see `phase0_report.md` section 5); needs the team's answers on GPU, privacy and budget (`multimodal_ingestion_design.md` sections 12 and 14). **Parked** (2026-11-24); tracked as FW-2 in section 12.
 19. Gemma 3 27B on the same protocol as 15, if an OpenAI-compatible endpoint (hosted or GPU) is available; Gemma 3 4B is not planned (another CPU floor).
 20. Answer layer productisation: HTTP endpoint with the chat states of `figma_ui_context.md`, multi-turn history, rate limits and cost accounting, ToC-chunk handling.
-21. Summarization
-22. Citation-aware QA over the UI
-23. Quiz generation
-24. Adaptive learning engine, weak-topic detection, mastery estimation
-25. Personalized exam generation, study recommendations
-26. FastAPI backend (upload, jobs, auth) + PostgreSQL
-27. React frontend
+21. Summarization (done: M4, plus combined summaries of several documents)
+22. Citation-aware QA over the UI (done: M3 and frontend F1)
+23. Quiz generation (done: M4, quiz taking M5, frontend F2)
+24. Adaptive learning engine, weak-topic detection, mastery estimation (now Sprint 2, mastery data model, and Sprint 3,
+    adaptive learning UX, in the [`README.md` roadmap](../README.md#roadmap); not started)
+25. Personalized exam generation, study recommendations (Sprint 3: personalized *practice* quizzes only, per the
+    proposed T-6 amendment [`TEAM_DECISION_T-7.md`](TEAM_DECISION_T-7.md); adaptive high-stakes exams stay excluded)
+26. FastAPI backend (upload, jobs, auth) + PostgreSQL (backend done in M0-M5 on SQLite; PostgreSQL is an open R1 decision)
+27. React frontend (Next.js; F0-F2 built)
 28. Docker/CI, upload limits, observability
 29. Gemma 3 27B production migration; Arabic support
+30. Audio lectures: upload, transcription with timestamps, indexing, audio citations (Sprint 4 in the
+    [`README.md` roadmap](../README.md#roadmap); not started)
 
 ---
 

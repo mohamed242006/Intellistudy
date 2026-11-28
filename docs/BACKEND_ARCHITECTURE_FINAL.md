@@ -392,7 +392,8 @@ All ids are server-generated UUIDv4 strings; all times are UTC.
 | M5 | quiz attempts, grading, release verification, end-to-end slice | 61 | #8 (`4ee4404`), #9 (`d990509`) | F-M5-01 (stale state after the submission claim, fixed); D5-11 immutability proven with race tests |
 | Close-out | documentation, flaky-test fixes | - | #10 failed, #11 green; #12 failed, #13 green (`8f7404d`) | two flaky tests stabilised: a CPU-timing ratio, and a Chroma equivalence check that used approximate search to list stored records |
 
-**Totals:** 298 gate items across M1-M5, plus M0's 74 foundation tests; 402 backend tests and 800 `ai/` tests per run.
+**Totals:** 298 gate items across M1-M5, plus M0's 74 foundation tests; 402 backend tests and 800 `ai/` tests per run
+(at M5 approval, 2026-11-25; on 2026-11-28 the backend suite has 417 tests, after combined summaries).
 Manual evidence with the real DeepSeek provider (M4 section 2.12, M5 section 2.11): every performance target met.
 
 | Measure (real lectures, DeepSeek) | Target | Result |
@@ -414,5 +415,9 @@ Manual evidence with the real DeepSeek provider (M4 section 2.12, M5 section 2.1
   web release.
 * **Quality** (M6): repair split words at ingestion (F-M4-07); fewer valid questions dropped; question flagging.
 * **By design:** no short-answer or essay questions, no adaptive exams, no AI-based grading (team decision T-6).
+  An amendment allowing formative personalized practice quizzes after the mastery model exists is proposed, not
+  accepted: [`TEAM_DECISION_T-7.md`](TEAM_DECISION_T-7.md).
+* **Feature sprints** (planned, not started except where noted): security and resilience, mastery data model,
+  adaptive learning UX, audio MVP. Status per item: [`README.md`](../README.md#roadmap).
 
 Details, owners and milestones: [`RELEASE_READINESS_PLAN.md`](RELEASE_READINESS_PLAN.md).

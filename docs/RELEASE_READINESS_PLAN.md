@@ -88,5 +88,8 @@ work, though, is more than a text notice:
 4. **M6 (group C).** Fix F-M4-07 at ingestion and reprocess, with the retrieval evaluation re-run. Change the quiz
    prompt so distractors are not named in the evidence. Add question flagging (FR-EXM-11), which also mitigates
    F-M4-02.
-5. **Future (group D).** F-M3-03 stays accepted, and is revisited if sharing between users is ever added. Semantic
+5. **Feature sprints 1-4** (security and resilience, mastery data model, adaptive learning UX, audio MVP), in that
+   order. Status per item is in the [`README.md` roadmap](../README.md#roadmap). Sprint 1 overlaps R1 only on rate
+   limiting: the shared limiter store stays an R1 item. The R1 and P1 gates above still apply.
+6. **Future (group D).** F-M3-03 stays accepted, and is revisited if sharing between users is ever added. Semantic
    question validation would need T-6 to be reopened (no LLM judge today).

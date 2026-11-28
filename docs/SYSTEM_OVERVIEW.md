@@ -46,7 +46,7 @@ student's material, and the backend verifies the result before the student sees 
 | AI | BAAI/bge-small-en-v1.5 embeddings, Chroma vector store, MiniLM cross-encoder re-ranker, DeepSeek through an OpenAI-compatible interface |
 | Document parsing | PyMuPDF, pdfplumber, python-pptx, python-docx, Tesseract OCR |
 | Security | Argon2id, JWT access tokens with rotating refresh tokens, sandboxed parser, per-user rate limits and token budget |
-| Quality | ruff, mypy, 402 backend tests and 800 AI-pipeline tests per CI run; gitleaks; pip-audit |
+| Quality | ruff, mypy, backend, AI-pipeline and frontend tests per CI run (417 backend and 800 AI-pipeline tests on 2026-11-28; 402 at M5 approval); gitleaks; pip-audit |
 
 ## Engineering approach
 
@@ -62,7 +62,8 @@ student's material, and the backend verifies the result before the student sees 
 
 Backend milestones M0-M5 are complete and approved, and CI is green. A manual demo on real lectures met every
 performance target. The frontend and cloud deployment are the next phases
-([`RELEASE_READINESS_PLAN.md`](RELEASE_READINESS_PLAN.md)).
+([`RELEASE_READINESS_PLAN.md`](RELEASE_READINESS_PLAN.md)). Planned feature sprints (security and resilience, mastery, adaptive
+learning, audio) are listed in the [`README.md` roadmap](../README.md#roadmap).
 
 ## Further reading
 
